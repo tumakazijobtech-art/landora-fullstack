@@ -101,3 +101,10 @@ table.data-table td{padding:12px;border-bottom:1px solid var(--s100)}
 .dashboard-grid{display:grid;grid-template-columns:1fr;gap:20px}
 .empty-state{text-align:center;padding:48px 20px;color:var(--s500)}
 .footer{text-align:center;padding:32px;color:var(--s400);font-size:12px}
+
+.nav-logo-img {
+  height: 31px;      /* adjust to taste */
+  width: 31px;
+  border-radius: 10px;
+  object-fit: contain;
+}
