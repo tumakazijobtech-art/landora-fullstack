@@ -1,5 +1,10 @@
 {
-  "dependencies": {
-    "mongodb": "^7.5.0"
+  "name": "landora-fullstack",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "npm --prefix frontend run build"
   }
 }
