@@ -106,7 +106,8 @@ those require provider accounts and credentials.
 
 - **Backend:** deploy to a Node host and set `MONGO_URI`, `JWT_SECRET`, and
   `CORS_ORIGINS` in the host's secret manager. Never commit `.env`.
-- **Frontend:** the included `vercel.json` installs and builds from `frontend/`,
-  producing `frontend/dist/`. Set `VITE_API_URL` in Vercel to the public backend URL
-  including `/api` before building.
+- **Frontend:** set the Vercel Project Root Directory to `frontend`. The included
+  `vercel.json` then installs and builds from that directory, producing `dist/`.
+  Set `VITE_API_URL` in Vercel to the public backend URL including `/api` before
+  building.
 - Serve both over HTTPS in production.

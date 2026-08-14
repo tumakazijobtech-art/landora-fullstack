@@ -17,7 +17,7 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '1mb' }));
 
-const allowedOrigins = (process.env.CORS_ORIGINS || 'https://landora-frontend.vercel.app/')
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim());
 
