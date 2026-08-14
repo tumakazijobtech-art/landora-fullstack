@@ -1,8 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import logo from '../assets/landora icon.png';
-
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -16,7 +14,7 @@ export default function Navbar() {
   return (
     <nav>
       <Link className="nav-brand" to="/">
-        <img src="/landora icon.png" alt="Landora" className="nav-logo-img" />
+        <div className="nav-logo">L</div>
         <div className="nav-name">Landora</div>
       </Link>
       <div className="nav-links">
