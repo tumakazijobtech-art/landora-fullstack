@@ -36,11 +36,19 @@ export const api = {
     ).toString();
     return request(`/parcels${qs ? `?${qs}` : ''}`);
   },
+  getLandUseOptions: () => request('/parcels/options/land-use'),
   getParcel: (id) => request(`/parcels/${id}`),
   createParcel: (payload, token) => request('/parcels', { method: 'POST', body: payload, token }),
   updateParcel: (id, payload, token) => request(`/parcels/${id}`, { method: 'PATCH', body: payload, token }),
   deleteParcel: (id, token) => request(`/parcels/${id}`, { method: 'DELETE', token }),
   myParcels: (token) => request('/parcels/mine/list', { token }),
+  adminListParcels: (token, params = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null))).toString();
+    return request(`/admin/parcels${qs ? `?${qs}` : ''}`, { token });
+  },
+  adminUpdateParcel: (id, payload, token) => request(`/admin/parcels/${id}`, { method: 'PATCH', body: payload, token }),
+  adminGetOptions: (token) => request('/admin/options', { token }),
+  adminAddLandUseOption: (payload, token) => request('/admin/options', { method: 'POST', body: payload, token }),
 
   applyToParcel: (payload, token) => request('/applications', { method: 'POST', body: payload, token }),
   myApplications: (token) => request('/applications/mine', { token }),

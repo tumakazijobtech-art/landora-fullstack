@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import ParcelCard from '../components/ParcelCard.jsx';
+import { Link } from 'react-router-dom';
 
 const COUNTIES = ['All counties', 'Nakuru', 'Nyeri', 'Uasin Gishu', 'Meru', 'Nyandarua'];
 const CROPS = ['Any crop', 'Maize', 'Wheat', 'Horticulture', 'Tea', 'Potatoes'];
 
 export default function Marketplace() {
-  const [filters, setFilters] = useState({ county: '', crop: '', search: '', financingAvailable: '', insured: '' });
+  const [filters, setFilters] = useState({ county: '', crop: '', landUse: '', search: '', financingAvailable: '', insured: '' });
   const [parcels, setParcels] = useState([]);
+  const [landUseOptions, setLandUseOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.getLandUseOptions().then((data) => setLandUseOptions(data.options || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +50,10 @@ export default function Marketplace() {
       <div className="section-inner">
         <div className="section-eyebrow">Find land</div>
         <h2 className="section-h2">Available parcels</h2>
+        <div className="match-banner">
+          <div><div className="section-eyebrow">Not sure where to begin?</div><strong>Let Landora narrow the field.</strong><span>Answer five practical questions and we’ll rank available parcels for your farm.</span></div>
+          <Link className="btn-green" to="/match">Find my match →</Link>
+        </div>
         <div className="filter-bar">
           <select className="filter-select" value={filters.county} onChange={(e) => update('county', e.target.value)}>
             {COUNTIES.map((c) => (
@@ -54,6 +64,10 @@ export default function Marketplace() {
             {CROPS.map((c) => (
               <option key={c} value={c === 'Any crop' ? '' : c}>{c}</option>
             ))}
+          </select>
+          <select className="filter-select" value={filters.landUse} onChange={(e) => update('landUse', e.target.value)}>
+            <option value="">Any land use</option>
+            {landUseOptions.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
           <input
             className="filter-select"

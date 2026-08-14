@@ -3,6 +3,7 @@ const { body, query, validationResult } = require('express-validator');
 const Parcel = require('../models/Parcel');
 const Application = require('../models/Application');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { getLandUseOptions } = require('../config/options');
 
 const router = express.Router();
 
@@ -14,6 +15,8 @@ router.get(
   [
     query('county').optional().trim(),
     query('crop').optional().trim(),
+    query('landUse').optional().trim(),
+    query('minRating').optional().isFloat({ min: 0, max: 5 }),
     query('minSize').optional().isFloat({ min: 0 }),
     query('maxSize').optional().isFloat({ min: 0 }),
     query('financingAvailable').optional().isBoolean(),
@@ -28,13 +31,15 @@ router.get(
       return res.status(400).json({ error: 'Invalid filter parameters' });
     }
 
-    const { county, crop, minSize, maxSize, financingAvailable, insured, search } = req.query;
+    const { county, crop, landUse, minRating, minSize, maxSize, financingAvailable, insured, search } = req.query;
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 12;
 
     const filter = { status: 'available' };
     if (county && county !== 'All counties') filter.county = county;
     if (crop && crop !== 'Any crop') filter.crop = crop;
+    if (landUse && landUse !== 'Any land use') filter.landUse = landUse;
+    if (minRating) filter.plotRating = { $gte: parseFloat(minRating) };
     if (financingAvailable === 'true') filter.financingAvailable = true;
     if (insured === 'true') filter.insured = true;
     if (minSize || maxSize) {
@@ -56,6 +61,11 @@ router.get(
     res.json({ parcels, total, page, pages: Math.ceil(total / limit) || 1 });
   }
 );
+
+// Public: land-use options are managed by the admin console.
+router.get('/options/land-use', async (req, res) => {
+  res.json({ options: await getLandUseOptions() });
+});
 
 // Public: single parcel detail.
 router.get('/:id', async (req, res) => {
@@ -80,7 +90,7 @@ router.post(
     body('reference').optional({ checkFalsy: true }).trim(),
     body('description').optional({ checkFalsy: true }).trim().isLength({ max: 4000 }),
     body('tags').optional().isArray(),
-    body('photos').optional().isArray(),
+    body('photos').optional().isArray({ max: 6 }),
     body('financingAvailable').optional().isBoolean(),
     body('insured').optional().isBoolean(),
   ],
@@ -91,7 +101,7 @@ router.post(
     }
 
     const {
-      title, county, location, sizeAcres, pricePerAcrePerSeason, crop, season,
+      title, county, location, sizeAcres, pricePerAcrePerSeason, crop, landUse, season,
       reference, description, tags, photos, financingAvailable, insured,
     } = req.body;
 
@@ -99,12 +109,14 @@ router.post(
 
     const parcel = await Parcel.create({
       owner: req.user._id,
-      title, county, location, sizeAcres, pricePerAcrePerSeason, crop, season,
-      reference, description,
+      title, county, location, sizeAcres, pricePerAcrePerSeason, crop, landUse, season,
+      reference: reference || `LND-${Date.now().toString(36).toUpperCase()}`,
+      description,
       tags: cleanTags,
-      photos: Array.isArray(photos) ? photos.slice(0, 8) : [],
+      photos: Array.isArray(photos) ? photos.slice(0, 6) : [],
       financingAvailable: !!financingAvailable,
       insured: !!insured,
+      status: 'under_review',
     });
 
     res.status(201).json({ parcel });
@@ -133,11 +145,13 @@ router.patch('/:id', requireAuth, requireRole('landowner'), async (req, res) => 
   }
 
   const editable = [
-    'title', 'county', 'location', 'sizeAcres', 'pricePerAcrePerSeason', 'crop', 'season',
+    'title', 'county', 'location', 'sizeAcres', 'pricePerAcrePerSeason', 'crop', 'landUse', 'season',
     'reference', 'description', 'tags', 'photos', 'financingAvailable', 'insured', 'status',
   ];
   editable.forEach((field) => {
-    if (req.body[field] !== undefined) parcel[field] = req.body[field];
+    if (req.body[field] !== undefined) parcel[field] = field === 'photos'
+      ? (Array.isArray(req.body[field]) ? req.body[field].slice(0, 6) : [])
+      : req.body[field];
   });
 
   await parcel.save();

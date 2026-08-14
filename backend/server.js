@@ -9,6 +9,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth');
 const parcelRoutes = require('./routes/parcels');
 const applicationRoutes = require('./routes/applications');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/parcels', parcelRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 

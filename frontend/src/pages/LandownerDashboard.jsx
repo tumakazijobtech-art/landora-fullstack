@@ -64,7 +64,7 @@ export default function LandownerDashboard() {
             You haven't listed any land yet. <Link to="/parcels/new">Create your first listing</Link>.
           </div>
         ) : (
-          <div className="panel" style={{ marginBottom: 32, overflowX: 'auto' }}>
+          <div className="panel responsive-table" style={{ marginBottom: 32, overflowX: 'auto' }}>
             <table className="data-table">
               <thead>
                 <tr>

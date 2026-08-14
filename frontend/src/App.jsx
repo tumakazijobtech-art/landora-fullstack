@@ -12,6 +12,8 @@ import ParcelDetail from './pages/ParcelDetail.jsx';
 import CreateParcel from './pages/CreateParcel.jsx';
 import LandownerDashboard from './pages/LandownerDashboard.jsx';
 import FarmerDashboard from './pages/FarmerDashboard.jsx';
+import Match from './pages/Match.jsx';
+import Admin from './pages/Admin.jsx';
 
 function Dashboard() {
   const { user } = useAuth();
@@ -28,6 +30,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/marketplace" element={<Marketplace />} />
+        <Route path="/match" element={<Match />} />
         <Route path="/parcels/:id" element={<ParcelDetail />} />
         <Route
           path="/parcels/new"
@@ -45,6 +48,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/admin" element={<ProtectedRoute role="admin"><Admin /></ProtectedRoute>} />
         <Route path="*" element={<Home />} />
       </Routes>
     </>

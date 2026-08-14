@@ -11,6 +11,7 @@ export default function ParcelDetail() {
   const [parcel, setParcel] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [slide, setSlide] = useState(0);
 
   const [applyOpen, setApplyOpen] = useState(false);
   const [applyForm, setApplyForm] = useState({ intendedCrop: '', seasonsRequested: 1, message: '' });
@@ -25,6 +26,12 @@ export default function ParcelDetail() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+  useEffect(() => {
+    if (!parcel?.photos?.length) return undefined;
+    const photoCount = Math.min(parcel.photos.length, 6);
+    const timer = setInterval(() => setSlide((s) => (s + 1) % photoCount), 5000);
+    return () => clearInterval(timer);
+  }, [parcel]);
 
   async function handleApply(e) {
     e.preventDefault();
@@ -45,14 +52,14 @@ export default function ParcelDetail() {
     }
   }
 
-  if (loading) return <div className="section"><div className="section-inner">Loading…</div></div>;
+  if (loading) return <div className="section"><div className="section-inner"><div className="skeleton-block" /></div></div>;
   if (error) return <div className="section"><div className="section-inner"><div className="error-box">{error}</div></div></div>;
   if (!parcel) return null;
 
   return (
     <div className="section">
       <div className="section-inner">
-        <div className="section-eyebrow">{parcel.location}, {parcel.county} County</div>
+        <div className="section-eyebrow">{parcel.location}, {parcel.county} County · {parcel.reference || 'Reference pending'}</div>
         <h2 className="section-h2">{parcel.title}</h2>
         <p className="section-sub">
           {parcel.reference && `Parcel reference ${parcel.reference} · `}
@@ -60,22 +67,19 @@ export default function ParcelDetail() {
           {parcel.owner && ` · Listed by ${parcel.owner.name}`}
         </p>
 
-        {parcel.photos && parcel.photos.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12, marginBottom: 24 }}>
-            {parcel.photos.map((src, i) => (
-              <img key={i} src={src} alt={`${parcel.title} photo ${i + 1}`} style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 12 }} />
-            ))}
-          </div>
-        )}
+        {parcel.photos?.length > 0 ? <div className="detail-slider"><img src={parcel.photos[slide % Math.min(parcel.photos.length, 6)]} alt={`${parcel.title} view ${(slide % Math.min(parcel.photos.length, 6)) + 1}`} /><div className="slider-controls"><button onClick={() => setSlide((slide - 1 + parcel.photos.length) % Math.min(parcel.photos.length, 6))} aria-label="Previous photo">←</button><span>{(slide % Math.min(parcel.photos.length, 6)) + 1} / {Math.min(parcel.photos.length, 6)}</span><button onClick={() => setSlide((slide + 1) % Math.min(parcel.photos.length, 6))} aria-label="Next photo">→</button></div></div> : <div className="detail-placeholder">Land photos will be added during review.</div>}
 
         <div className="panel" style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+          <div className="facts-grid">
             <div>
               <div style={{ fontSize: 12, color: 'var(--s500)' }}>Price</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--g700)' }}>
                 KES {Number(parcel.pricePerAcrePerSeason).toLocaleString()} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--s500)' }}>per ac / season</span>
               </div>
             </div>
+            <div><div className="fact-label">Land use</div><div className="fact-value">{parcel.landUse || 'Under review'}</div></div>
+            <div><div className="fact-label">Plot rating</div><div className="fact-value">{parcel.plotRating != null ? `${Number(parcel.plotRating).toFixed(1)} / 5` : 'Not rated yet'}</div></div>
+            <div><div className="fact-label">Landora match</div><div className="fact-value">{parcel.matchScore != null ? `${parcel.matchScore}%` : 'Personalise your match'}</div></div>
             <div>
               <div style={{ fontSize: 12, color: 'var(--s500)' }}>Crop</div>
               <div style={{ fontWeight: 600 }}>{parcel.crop}</div>
@@ -95,6 +99,18 @@ export default function ParcelDetail() {
             </div>
           )}
         </div>
+        <div className="verification-grid">
+          <div className="verification-callout"><strong>Verification status</strong><span>{parcel.status === 'available' ? 'Available for applications' : (parcel.status || 'Review in progress').replace('_', ' ')}</span><small>Landora publishes evidence as it is reviewed, not as a promise.</small></div>
+          <div className="panel"><div className="fact-label">Verified key facts</div>{parcel.keyFacts?.length ? <ul className="facts-list">{parcel.keyFacts.map((fact, index) => <li key={`${fact.label || fact}-${index}`}><span>{fact.label || 'Reviewed note'}</span><strong>{fact.value || fact}</strong></li>)}</ul> : <p className="muted">Key facts are added by the internal review team.</p>}{parcel.keyFactsVerified && <small className="verified-text">Verified by {parcel.keyFactsVerifiedBy || 'GIS Engine + human intelligence'}</small>}</div>
+        </div>
+        <div className="evidence-strip"><strong>Evidence & sources</strong><span>{parcel.ministryVerification?.status === 'verified' ? `Ministry title verified via ${parcel.ministryVerification.method}` : 'Ministry verification pending'}</span><span>{parcel.gisReportStatus === 'completed' ? 'GIS report completed' : 'GIS report pending'}</span>{parcel.ministryVerification?.reference && <span>Ref {parcel.ministryVerification.reference}</span>}</div>
+        <section className="panel evidence-section">
+          <div className="section-eyebrow">GIS evidence</div>
+          <h3>Parcel map and boundary</h3>
+          {parcel.parcelMapUrl ? <img className="parcel-map" src={parcel.parcelMapUrl} alt={`GIS parcel map for ${parcel.title}`} /> : <div className="map-placeholder"><strong>GIS Land Productivity Report Engine</strong><span>The parcel map is added after the landowner submission is reviewed.</span></div>}
+          <p className="muted">{parcel.parcelMapSource || 'Boundary source will be recorded by the internal GIS review team.'}</p>
+        </section>
+        {parcel.videoUrl && <section className="panel evidence-section"><div className="section-eyebrow">Walkthrough</div><h3>See the parcel in context</h3><video className="walkthrough-video" controls preload="metadata" src={parcel.videoUrl}>Your browser cannot play this walkthrough.</video><a className="text-link" href={parcel.videoUrl} target="_blank" rel="noreferrer">Open walkthrough in a new tab</a></section>}
 
         {parcel.description && (
           <div style={{ marginBottom: 24 }}>

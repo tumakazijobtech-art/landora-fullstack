@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -7,7 +7,7 @@ const TAG_OPTIONS = ['Financing', 'Insured', 'River access', 'Road access', 'Bor
 
 const EMPTY = {
   title: '', reference: '', county: '', location: '', sizeAcres: '', pricePerAcrePerSeason: '',
-  crop: '', season: '', description: '', photos: '', tags: [], financingAvailable: false, insured: false,
+  crop: '', season: '', landUse: '', description: '', photos: '', tags: [], financingAvailable: false, insured: false,
 };
 
 export default function CreateParcel() {
@@ -16,6 +16,11 @@ export default function CreateParcel() {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [landUseOptions, setLandUseOptions] = useState([]);
+
+  useEffect(() => {
+    api.getLandUseOptions().then((data) => setLandUseOptions(data.options || [])).catch(() => {});
+  }, []);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -71,6 +76,11 @@ export default function CreateParcel() {
                   <input required value={form.location} onChange={(e) => update('location', e.target.value)} />
                 </div>
               </div>
+              <div className="field">
+                <label>Land use</label>
+                <input list="land-use-options" value={form.landUse} onChange={(e) => update('landUse', e.target.value)} placeholder="e.g. crop farming, grazing" />
+                <datalist id="land-use-options">{landUseOptions.map((option) => <option key={option} value={option} />)}</datalist>
+              </div>
               <div className="field-row">
                 <div className="field">
                   <label>Size (acres)</label>
@@ -95,6 +105,7 @@ export default function CreateParcel() {
                 <label>Parcel reference (optional)</label>
                 <input value={form.reference} onChange={(e) => update('reference', e.target.value)} />
               </div>
+              <div className="info-box">You only need to provide the basics here. GIS evidence, verified key facts and a walkthrough video are added during Landora’s internal review.</div>
               <div className="field">
                 <label>Photo URLs (comma separated, optional)</label>
                 <input value={form.photos} onChange={(e) => update('photos', e.target.value)} placeholder="https://..., https://..." />
