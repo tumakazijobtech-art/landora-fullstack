@@ -73,7 +73,7 @@ export default function CreateParcel() {
         <div className="panel" style={{ maxWidth: 640 }}>
           <div className="info-box">
             Once you publish, our GIS engine and field team verify the parcel and add the key facts,
-            productivity report, boundary map, and a video walkthrough — usually within a few days.
+            productivity report, boundary map, and a video walkthrough, usually within a few days.
             You'll see those appear on your listing automatically.
           </div>
           {error && <div className="error-box">{error}</div>}
@@ -145,11 +145,11 @@ export default function CreateParcel() {
                 </div>
               </div>
               <div className="field">
-                <label>Parcel reference (optional — we'll generate one if left blank)</label>
+                <label>Parcel reference (optional, we'll generate one if left blank)</label>
                 <input value={form.reference} onChange={(e) => update('reference', e.target.value)} />
               </div>
               <div className="field">
-                <label>Photo URLs, comma separated (up to 6 — these auto-slide on your listing)</label>
+                <label>Photo URLs, comma separated (up to 6, these auto slide on your listing)</label>
                 <input value={form.photos} onChange={(e) => update('photos', e.target.value)} placeholder="https://..., https://..." />
                 <div style={{ fontSize: 12, color: photoCount > 6 ? '#A3392A' : 'var(--s500)', marginTop: 4 }}>
                   {photoCount} / 6 photos

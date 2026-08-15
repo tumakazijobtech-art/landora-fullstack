@@ -88,7 +88,7 @@ function ApplicationsPanel({ token }) {
                       {a.parcel?.county ? ` · ${a.parcel.county} County` : ''}
                     </div>
                     <div style={{ fontSize: 11.5, color: 'var(--s400)', marginTop: 2 }}>
-                      Landowner: {a.landowner?.name || '—'}
+                      Landowner: {a.landowner?.name || 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -180,9 +180,9 @@ function WaitlistPanel({ token }) {
                     <div>{entry.email}</div>
                     {entry.phone && <div style={{ fontSize: 11, color: 'var(--s400)' }}>{entry.phone}</div>}
                   </td>
-                  <td>{entry.county || '—'}</td>
+                  <td>{entry.county || 'N/A'}</td>
                   <td>
-                    {entry.cropInterest || '—'}
+                    {entry.cropInterest || 'N/A'}
                     {entry.parcel && <div style={{ fontSize: 11, color: 'var(--s400)' }}>{entry.parcel.title}</div>}
                   </td>
                   <td><span className={`status-pill ${entry.type === 'prebooking' ? 'status-pending' : ''}`}>{entry.type}</span></td>
@@ -340,7 +340,7 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td>{p.county}</td>
-                        <td>{p.score || '—'}</td>
+                        <td>{p.score || 'N/A'}</td>
                         <td>
                           <span className={`status-pill ${p.titleVerification?.status === 'verified' ? 'status-accepted' : p.titleVerification?.status === 'flagged' ? 'status-declined' : 'status-pending'}`}>
                             {p.titleVerification?.status ? p.titleVerification.status.replace('_', ' ') : 'unverified'}

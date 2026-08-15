@@ -28,7 +28,7 @@ export default function Home() {
       <div className="hero hero-light">
         <LightHeroBackground />
         <div className="hero-inner">
-          <h1 className="hero-h1">A simpler way to accessing productive land</h1>
+          <h1 className="hero-h1">A simpler way to accessing <span className="hero-h1-accent">productive land</span></h1>
           <p className="hero-sub">
             Landora makes it easier to find and secure agricultural land, with verified parcels,
             transparent pricing, secure digital leases, weather protection and the resources you

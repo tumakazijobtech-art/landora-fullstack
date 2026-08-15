@@ -297,7 +297,7 @@ export default function AdminParcelEditor() {
                 <label htmlFor="adminPreBooking" style={{ margin: 0 }}>Allow pre booking ahead of the next season</label>
               </div>
               <div className="field">
-                <label>Photo URLs, comma separated (up to 6 — these auto-slide on the listing)</label>
+                <label>Photo URLs, comma separated (up to 6, these auto slide on the listing)</label>
                 <input value={photosText} onChange={(e) => setPhotosText(e.target.value)} placeholder="https://..., https://..." />
                 <div style={{ fontSize: 12, color: 'var(--s500)', marginTop: 4 }}>
                   {photosText.split(',').map((s) => s.trim()).filter(Boolean).length} / 6 photos
@@ -349,12 +349,12 @@ export default function AdminParcelEditor() {
                 <div className="field"><label>Insurance detail</label><input value={keyFacts.insuranceDetail || ''} onChange={(e) => updateKeyFacts('insuranceDetail', e.target.value)} /></div>
               </div>
               <div className="field">
-                <label>Listing highlights — one per line, shown as bullets on the browse page and listing</label>
+                <label>Listing highlights, one per line, shown as bullets on the browse page and listing</label>
                 <textarea
                   rows={5}
                   value={highlightsText}
                   onChange={(e) => setHighlightsText(e.target.value)}
-                  placeholder={'Title deed ready for transfer\nBorehole and gravity-fed water on site\nAll-weather road access\nZoned for horticulture and mixed cropping'}
+                  placeholder={'Title deed ready for transfer\nBorehole and gravity fed water on site\nAll weather road access\nZoned for horticulture and mixed cropping'}
                 />
                 <div style={{ fontSize: 12, color: 'var(--s500)', marginTop: 4 }}>
                   {highlightsText.split('\n').map((s) => s.trim()).filter(Boolean).length} / 8 highlights
@@ -385,7 +385,7 @@ export default function AdminParcelEditor() {
                     <option value="unverified">Not yet checked</option>
                     <option value="pending">Check in progress</option>
                     <option value="verified">Verified</option>
-                    <option value="flagged">Flagged — needs follow-up</option>
+                    <option value="flagged">Flagged, needs follow up</option>
                   </select>
                 </div>
               </div>
@@ -407,8 +407,8 @@ export default function AdminParcelEditor() {
             <div className="card-sub">Rate range and metric bars shown at the top of the report.</div>
             <div className="field-group">
               <div className="field-row">
-                <div className="field"><label>Fair rate range — min (KES/ac/season)</label><input type="number" value={report.rateRangeMin || ''} onChange={(e) => updateReport('rateRangeMin', e.target.value)} /></div>
-                <div className="field"><label>Fair rate range — max</label><input type="number" value={report.rateRangeMax || ''} onChange={(e) => updateReport('rateRangeMax', e.target.value)} /></div>
+                <div className="field"><label>Fair rate range, minimum (KES/ac/season)</label><input type="number" value={report.rateRangeMin || ''} onChange={(e) => updateReport('rateRangeMin', e.target.value)} /></div>
+                <div className="field"><label>Fair rate range, maximum</label><input type="number" value={report.rateRangeMax || ''} onChange={(e) => updateReport('rateRangeMax', e.target.value)} /></div>
               </div>
               <div className="field-row">
                 <div className="field"><label>Soil quality (%)</label><input type="number" min="0" max="100" value={report.metrics?.soilQuality ?? ''} onChange={(e) => updateMetric('soilQuality', e.target.value)} /></div>

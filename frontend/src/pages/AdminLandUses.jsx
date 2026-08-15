@@ -80,7 +80,7 @@ export default function AdminLandUses() {
 
         <div className="panel" style={{ maxWidth: 480 }}>
           {landUses.length === 0 ? (
-            <div className="empty-state">No land use options yet — add the first one above.</div>
+            <div className="empty-state">No land use options yet. Add the first one above.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {landUses.map((lu) => (

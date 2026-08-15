@@ -8,7 +8,7 @@ export default function Terms() {
         <h1 className="section-h2">Terms &amp; Conditions</h1>
         <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 16, color: 'var(--s700)', fontSize: 14, lineHeight: 1.7 }}>
           <p>
-            By creating a Landora account you agree to use the platform in good faith — as a farmer searching
+            By creating a Landora account you agree to use the platform in good faith, as a farmer searching
             for land to lease, or as a landowner listing land you have the right to lease out. Landora acts as
             the marketplace and qualification layer between the two: listings are reviewed and enriched by our
             team, and lease applicants are qualified and matched to landowners by Landora, not by the

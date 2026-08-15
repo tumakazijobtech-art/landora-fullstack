@@ -47,6 +47,7 @@ nav{position:sticky;top:0;z-index:100;background:rgba(247,243,236,0.92);backdrop
 @media (prefers-reduced-motion:reduce){.hero-bg-layer{transition:none}}
 .hero-eyebrow{display:inline-block;background:rgba(200,136,26,0.2);color:var(--o400);font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;padding:4px 12px;border-radius:4px;margin-bottom:20px}
 .hero-h1{font-size:44px;font-weight:700;color:var(--o400);line-height:1.1;letter-spacing:-1.5px;margin-bottom:20px}
+.hero-h1-accent{color:var(--o500)}
 .hero-sub{color:var(--g200);font-size:16px;line-height:1.65;margin-bottom:32px;max-width:520px}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
 

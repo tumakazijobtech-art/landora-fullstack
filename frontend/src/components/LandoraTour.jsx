@@ -9,7 +9,7 @@ const TABS = [
     key: 'aerial',
     label: 'Aerial view',
     title: 'See the whole parcel from above first',
-    copy: 'Satellite-style context and county boundaries before you ever leave the app, so a "4.5 acres in Subukia" is not just a number.',
+    copy: 'Satellite style context and county boundaries before you ever leave the app, so a "4.5 acres in Subukia" is not just a number.',
     image: 'https://images.pexels.com/photos/3030296/pexels-photo-3030296.jpeg?auto=compress&cs=tinysrgb&w=1400',
     chip: 'GIS overview · updated this season',
   },
@@ -19,7 +19,7 @@ const TABS = [
     title: 'Walk the terrain, not just the outline',
     copy: 'A guided sense of access roads, tree cover and slope, built from the same details field agents record on the ground.',
     image: 'https://images.pexels.com/photos/12210597/pexels-photo-12210597.jpeg?auto=compress&cs=tinysrgb&w=1400',
-    chip: 'Field-verified access and terrain notes',
+    chip: 'Field verified access and terrain notes',
   },
   {
     key: 'video',
@@ -34,7 +34,7 @@ const TABS = [
     key: 'map',
     label: 'Boundary map',
     title: 'A GIS boundary you can actually check',
-    copy: 'Cadastral references cross-checked against county records and satellite imagery, with streams and access roads plotted alongside the plot edge.',
+    copy: 'Cadastral references checked against county records and satellite imagery, with streams and access roads plotted alongside the plot edge.',
     image: 'https://images.pexels.com/photos/30557705/pexels-photo-30557705.jpeg?auto=compress&cs=tinysrgb&w=1400',
     chip: 'Boundary verified against Ardhisasa',
   },
@@ -59,7 +59,7 @@ export default function LandoraTour() {
           <div className="section-eyebrow">Take the short tour</div>
           <h2 className="section-h2">Everything a real listing shows you</h2>
           <p className="section-sub">
-            No two ways to see the same parcel look alike, so Landora stitches them into one walk-through
+            No two ways to see the same parcel look alike, so Landora stitches them into one walkthrough
             and a remote search still feels like standing on the land.
           </p>
         </div>

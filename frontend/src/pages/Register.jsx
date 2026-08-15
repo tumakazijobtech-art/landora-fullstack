@@ -83,7 +83,7 @@ export default function Register() {
               <input
                 value={form.profilePicture}
                 onChange={(e) => update('profilePicture', e.target.value)}
-                placeholder="https://... — leave blank to use the Landora logo"
+                placeholder="https://... (leave blank to use the Landora logo)"
               />
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
                 {form.profilePicture ? (
@@ -91,7 +91,7 @@ export default function Register() {
                 ) : (
                   <img src={LOGO_URL} alt="Default Landora avatar" style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--s100)' }} />
                 )}
-                <span style={{ fontSize: 11.5, color: 'var(--s500)' }}>Preview — this shows up in your navbar and dashboard</span>
+                <span style={{ fontSize: 11.5, color: 'var(--s500)' }}>Preview: this shows up in your navbar and dashboard</span>
               </div>
             </div>
           </div>

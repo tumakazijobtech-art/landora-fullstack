@@ -77,7 +77,7 @@ export default function Profile() {
                 <input
                   value={form.profilePicture}
                   onChange={(e) => update('profilePicture', e.target.value)}
-                  placeholder="https://... — leave blank to use the Landora logo"
+                  placeholder="https://... (leave blank to use the Landora logo)"
                 />
                 <div style={{ fontSize: 11.5, color: 'var(--s500)', marginTop: 6 }}>
                   Shown in the navbar, your dashboard, and on your listings. Leave blank for the default Landora mark.

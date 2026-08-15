@@ -161,11 +161,11 @@ function WizardBody({ steps, step, form, update, error, submitting, type, next, 
 
       {step === 2 && (
         <div className="apply-wizard-review">
-          <div className="kv-row"><span>Name</span><strong>{form.applicantName || '—'}</strong></div>
-          <div className="kv-row"><span>Phone</span><strong>{form.applicantPhone || '—'}</strong></div>
-          <div className="kv-row"><span>Intended crop</span><strong>{form.intendedCrop || '—'}</strong></div>
+          <div className="kv-row"><span>Name</span><strong>{form.applicantName || 'N/A'}</strong></div>
+          <div className="kv-row"><span>Phone</span><strong>{form.applicantPhone || 'N/A'}</strong></div>
+          <div className="kv-row"><span>Intended crop</span><strong>{form.intendedCrop || 'N/A'}</strong></div>
           {type === 'prebooking' ? (
-            <div className="kv-row"><span>Season</span><strong>{form.preferredSeason || '—'}</strong></div>
+            <div className="kv-row"><span>Season</span><strong>{form.preferredSeason || 'N/A'}</strong></div>
           ) : (
             <div className="kv-row"><span>Seasons requested</span><strong>{form.seasonsRequested}</strong></div>
           )}

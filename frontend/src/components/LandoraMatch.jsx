@@ -48,7 +48,7 @@ export default function LandoraMatch({ open, onClose, onMatch }) {
         <div className="card-title" style={{ marginBottom: 4 }}>Landora Match</div>
         <div className="card-sub" style={{ maxWidth: 460 }}>
           Set what you need once. Landora's recommender engine scores and ranks every verified
-          parcel against it — so instead of a plain filter, you get a personalised match
+          parcel against it, so instead of a plain filter, you get a personalised match
           percentage and the reasons behind it.
         </div>
 

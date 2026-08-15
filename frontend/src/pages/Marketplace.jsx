@@ -11,8 +11,24 @@ const DEFAULT_FILTERS = {
   minScore: '', near: '', withinKm: '', minSize: '', maxSize: '', maxPrice: '', waterAccess: '', match: '',
 };
 
+// Filters are cached in sessionStorage so they survive a visit to a parcel detail
+// page and back: without this, using the browser/back button (or the site's own
+// back link) after opening a listing would silently reset every filter a farmer
+// had already set, forcing them to redo the search from scratch.
+const FILTERS_CACHE_KEY = 'landora_marketplace_filters';
+
+function loadCachedFilters() {
+  try {
+    const raw = sessionStorage.getItem(FILTERS_CACHE_KEY);
+    if (!raw) return DEFAULT_FILTERS;
+    return { ...DEFAULT_FILTERS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_FILTERS;
+  }
+}
+
 export default function Marketplace() {
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState(loadCachedFilters);
   const [landUses, setLandUses] = useState([]);
   const [parcels, setParcels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +60,16 @@ export default function Marketplace() {
     return () => {
       cancelled = true;
     };
+  }, [filters]);
+
+  // Keep the cache in sync with whatever is currently applied, including when a
+  // filter is cleared, so returning to this page always restores the last search.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(FILTERS_CACHE_KEY, JSON.stringify(filters));
+    } catch {
+      // Storage unavailable (private browsing, quota, etc.) — filters just won't persist.
+    }
   }, [filters]);
 
   function update(field, value) {
@@ -95,12 +121,12 @@ export default function Marketplace() {
                 {loading
                   ? 'Scoring parcels against your requirements…'
                   : parcels.length > 0
-                    ? `Ranked ${parcels.length} parcel${parcels.length === 1 ? '' : 's'} by fit${bestMatch ? ` — best match ${bestMatch.matchScore}%` : ''}`
+                    ? `Ranked ${parcels.length} parcel${parcels.length === 1 ? '' : 's'} by fit${bestMatch ? ` · best match ${bestMatch.matchScore}%` : ''}`
                     : 'No parcels to rank yet'}
               </div>
               <div className="match-header-sub">
                 Each parcel below is scored on land use, budget, acreage, distance, water access and its GIS plot
-                rating — the closer to 100%, the better the fit.
+                rating. The closer to 100%, the better the fit.
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
@@ -159,7 +185,7 @@ export default function Marketplace() {
           <div className="empty-state">
             {isMatchMode
               ? 'No listings are available to rank yet. Try widening your requirements, or check back soon.'
-              : 'No listings match these filters yet. Try widening your search, or check back soon — new parcels are added as landowners list them.'}
+              : 'No listings match these filters yet. Try widening your search, or check back soon. New parcels are added as landowners list them.'}
           </div>
         )}
         <div className="parcels-grid">

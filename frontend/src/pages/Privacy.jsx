@@ -8,8 +8,8 @@ export default function Privacy() {
         <h1 className="section-h2">Privacy Policy</h1>
         <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 16, color: 'var(--s700)', fontSize: 14, lineHeight: 1.7 }}>
           <p>
-            Landora collects the details you provide when you create an account — your name, email, phone
-            number, county, role, and optionally a profile picture — along with any listing or application
+            Landora collects the details you provide when you create an account, including your name, email,
+            phone number, county, role, and optionally a profile picture, along with any listing or application
             details you submit. This information is used to operate the marketplace: matching farmers to land,
             verifying listings, and enabling landowners and the Landora team to review applicants.
           </p>
@@ -24,8 +24,8 @@ export default function Privacy() {
             support team.
           </p>
           <p>
-            We use industry-standard measures — including password hashing and, where enabled, two-factor
-            verification — to protect your account.
+            We use industry standard measures, including password hashing and, where enabled, two factor
+            verification, to protect your account.
           </p>
         </div>
       </div>

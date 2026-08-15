@@ -95,7 +95,7 @@ export default function LandownerDashboard() {
         </div>
         <div className="info-box" style={{ marginBottom: 20 }}>
           The Landora team reviews and qualifies every applicant on your behalf. You can see who has applied
-          and their status here — accepting or declining is handled by our team once an applicant is verified.
+          and their status here. Accepting or declining is handled by our team once an applicant is verified.
         </div>
 
         {applications.length === 0 ? (
@@ -114,7 +114,7 @@ export default function LandownerDashboard() {
                       </div>
                     )}
                     <div>
-                      <div style={{ fontWeight: 600 }}>{a.farmer?.name} — {a.parcel?.title}</div>
+                      <div style={{ fontWeight: 600 }}>{a.farmer?.name} · {a.parcel?.title}</div>
                       <div style={{ fontSize: 12, color: 'var(--s500)' }}>
                         {a.farmer?.phone && `${a.farmer.phone} · `}{a.farmer?.email}
                       </div>
