@@ -20,6 +20,25 @@ const userSchema = new mongoose.Schema(
     },
     phone: { type: String, trim: true, maxlength: 20 },
     county: { type: String, trim: true, maxlength: 60 },
+    emailVerified: { type: Boolean, default: false },
+    phoneVerified: { type: Boolean, default: false },
+    verificationPolicy: {
+      requireOnSignup: { type: Boolean, default: false },
+      requireOnSignIn: { type: Boolean, default: false },
+    },
+    verification: {
+      purpose: { type: String, enum: ['signup', 'signin'], default: null },
+      emailCodeHash: { type: String, default: null },
+      phoneCodeHash: { type: String, default: null },
+      emailCodeExpiresAt: { type: Date, default: null },
+      phoneCodeExpiresAt: { type: Date, default: null },
+    },
+    passwordReset: {
+      emailCodeHash: { type: String, default: null },
+      phoneCodeHash: { type: String, default: null },
+      emailCodeExpiresAt: { type: Date, default: null },
+      phoneCodeExpiresAt: { type: Date, default: null },
+    },
   },
   { timestamps: true }
 );
@@ -41,6 +60,9 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     role: this.role,
     phone: this.phone,
     county: this.county,
+    emailVerified: this.emailVerified,
+    phoneVerified: this.phoneVerified,
+    verificationPolicy: this.verificationPolicy,
     createdAt: this.createdAt,
   };
 };

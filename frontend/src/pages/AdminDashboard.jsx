@@ -9,9 +9,15 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [authSettings, setAuthSettings] = useState(null);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   function load() {
-    return api.adminParcels(token).then((data) => setParcels(data.parcels));
+    return Promise.all([api.adminParcels(token), api.adminAuthSettings(token)])
+      .then(([parcelData, settingsData]) => {
+        setParcels(parcelData.parcels);
+        setAuthSettings(settingsData.settings);
+      });
   }
 
   useEffect(() => {
@@ -21,6 +27,19 @@ export default function AdminDashboard() {
   }, []);
 
   const visible = filter ? parcels.filter((p) => p.enrichmentStatus === filter) : parcels;
+
+  async function updateAuthSetting(field, value) {
+    setError('');
+    setSavingSettings(true);
+    try {
+      const data = await api.updateAdminAuthSettings({ [field]: value }, token);
+      setAuthSettings(data.settings);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingSettings(false);
+    }
+  }
 
   if (loading) return <div className="section"><div className="section-inner">Loading…</div></div>;
 
@@ -35,6 +54,32 @@ export default function AdminDashboard() {
           <Link className="btn-outline-green" to="/admin/land-uses">Manage land uses</Link>
         </div>
         {error && <div className="error-box">{error}</div>}
+
+        {authSettings && (
+          <div className="panel admin-security-panel">
+            <div>
+              <div className="section-eyebrow">Account protection</div>
+              <h3 className="admin-panel-title">Verification policy</h3>
+              <p className="card-sub">These controls apply to new users. Both email and phone codes are required whenever a policy is enabled.</p>
+            </div>
+            <div className="security-toggles">
+              <label className="toggle-row">
+                <span>
+                  <strong>Verify new users on sign up</strong>
+                  <small>Require both channels before the first session begins.</small>
+                </span>
+                <input type="checkbox" checked={authSettings.requireVerificationOnSignup} disabled={savingSettings} onChange={(event) => updateAuthSetting('requireVerificationOnSignup', event.target.checked)} />
+              </label>
+              <label className="toggle-row">
+                <span>
+                  <strong>Verify on every sign in</strong>
+                  <small>Send a fresh email code and phone code each time a new user logs in.</small>
+                </span>
+                <input type="checkbox" checked={authSettings.requireVerificationOnSignIn} disabled={savingSettings} onChange={(event) => updateAuthSetting('requireVerificationOnSignIn', event.target.checked)} />
+              </label>
+            </div>
+          </div>
+        )}
 
         <div className="filter-bar">
           <span className={`filter-badge ${filter === '' ? 'active' : ''}`} onClick={() => setFilter('')}>All ({parcels.length})</span>

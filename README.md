@@ -25,11 +25,17 @@ every listing and application you see comes from an account created through the 
   parcel in the same admin editor, and shown to farmers as a verified badge once done.
 - **Admin can edit any listing**, any field, at any time.
 - **Working hamburger menu** on small screens.
+- **Account recovery with two-channel verification** — password resets require both an email code
+  and a phone code.
+- **Admin verification policy controls** — require both channels for new-user sign-up and/or every
+  sign-in.
+- **A guided land tour homepage** — centered hero, mapped-parcel visuals, and a short inspection
+  journey using the supplied project imagery.
 
 This does **not** yet include the other role dashboards from the original design
 (investor, insurer, agronomist, agrovet, transporter), live chat, insurance payout
-simulation, or ID/OTP verification — those need either a lot more build time, or
-third-party provider accounts (see "What's stubbed out" below).
+simulation, or national-ID verification — those need either a lot more build time, or
+third-party provider accounts (see "Verification delivery" below).
 
 ## Project structure
 
@@ -102,13 +108,29 @@ every listing, edit any of them, add the verified key facts / productivity repor
   ownership before allowing edits — a landowner can only manage their own parcels, a
   farmer can only withdraw their own applications.
 
+## Verification delivery
+
+The verification flow is implemented end to end in the API and UI. It generates separate,
+short-lived email and phone codes, stores only hashes, requires both codes, and supports:
+
+- `/api/auth/forgot-password/request` and `/api/auth/forgot-password/reset`
+- `/api/auth/verification/resend` and `/api/auth/verification/confirm`
+- persisted admin settings at `/api/admin/auth-settings`
+
+The downloaded project stays runnable without vendor credentials by using optional delivery
+webhooks. Set `EMAIL_WEBHOOK_URL` and `SMS_WEBHOOK_URL` to your email/SMS provider adapters
+before enabling verification in production. For local QA only, set
+`DEV_RETURN_VERIFICATION_CODES=true` to show the generated codes in the recovery screen; in
+production they are never returned to the browser.
+
 ## What's stubbed out (needs your own provider accounts)
 
 The original design includes SMS OTP, IPRS national ID verification, and M-Pesa
 payments. These are **not fake-implemented** — they simply aren't wired up yet, because
 they require real accounts and API keys only you can obtain:
 
-- SMS/OTP: e.g. Africa's Talking, Twilio
+- Direct SMS/email vendor SDK setup: the webhook boundary accepts Africa's Talking, Twilio,
+  SendGrid, Postmark, or another provider without tying the ZIP to one vendor
 - ID verification: an IPRS-integrated KYC provider
 - Payments: Safaricom Daraja (M-Pesa)
 

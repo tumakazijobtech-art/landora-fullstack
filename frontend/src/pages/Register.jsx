@@ -22,6 +22,10 @@ export default function Register() {
     setSubmitting(true);
     try {
       const data = await api.register(form);
+      if (data.requiresVerification) {
+        navigate(`/verify?email=${encodeURIComponent(form.email)}&purpose=signup`, { state: { email: form.email, purpose: 'signup' } });
+        return;
+      }
       login(data.token, data.user);
       navigate(data.user.role === 'landowner' ? '/dashboard' : '/marketplace');
     } catch (err) {
@@ -59,8 +63,8 @@ export default function Register() {
               <input required minLength={8} type="password" value={form.password} onChange={(e) => update('password', e.target.value)} />
             </div>
             <div className="field">
-              <label>Phone (optional)</label>
-              <input value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="07XX XXX XXX" />
+              <label>Phone number</label>
+              <input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="07XX XXX XXX" />
             </div>
             <div className="field">
               <label>County (optional)</label>
@@ -72,7 +76,7 @@ export default function Register() {
           </button>
         </form>
         <div style={{ marginTop: 16, fontSize: 13, color: 'var(--s500)' }}>
-          Already have an account? <Link to="/login">Log in</Link>
+           Already have an account? <Link to="/login">Log in</Link>
         </div>
       </div>
     </div>

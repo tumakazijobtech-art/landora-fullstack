@@ -1,6 +1,6 @@
 import { cacheGet, cacheSet, cacheInvalidate } from './cache.js';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 async function request(path, { method = 'GET', body, token, cacheTtlMs } = {}) {
   const cacheKey = `${method}:${path}`;
@@ -15,11 +15,16 @@ async function request(path, { method = 'GET', body, token, cacheTtlMs } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error('Landora could not reach the API. Check that the backend is running and try again.');
+  }
 
   let data = null;
   try {
@@ -50,6 +55,10 @@ const LAND_USES_TTL_MS = 5 * 60 * 1000;
 export const api = {
   register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
   login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
+  resendVerification: (payload) => request('/auth/verification/resend', { method: 'POST', body: payload }),
+  confirmVerification: (payload) => request('/auth/verification/confirm', { method: 'POST', body: payload }),
+  requestPasswordReset: (payload) => request('/auth/forgot-password/request', { method: 'POST', body: payload }),
+  resetPassword: (payload) => request('/auth/forgot-password/reset', { method: 'POST', body: payload }),
   me: (token) => request('/auth/me', { token }),
 
   listParcels: (params = {}) => {
@@ -108,6 +117,9 @@ export const api = {
   // map/video-walkthrough enrichment pass.
   adminParcels: (token) => request('/admin/parcels', { token }),
   adminGetParcel: (id, token) => request(`/admin/parcels/${id}`, { token }),
+  adminAuthSettings: (token) => request('/admin/auth-settings', { token }),
+  updateAdminAuthSettings: (payload, token) =>
+    request('/admin/auth-settings', { method: 'PATCH', body: payload, token }),
   adminUpdateParcel: (id, payload, token) =>
     request(`/admin/parcels/${id}`, { method: 'PATCH', body: payload, token }).then((data) => {
       cacheInvalidate('GET:/parcels');

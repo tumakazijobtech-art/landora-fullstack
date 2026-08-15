@@ -7,6 +7,8 @@ import { useAuth } from './context/AuthContext.jsx';
 import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import VerifyAccount from './pages/VerifyAccount.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
 import Marketplace from './pages/Marketplace.jsx';
 import ParcelDetail from './pages/ParcelDetail.jsx';
 
@@ -42,6 +44,8 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify" element={<VerifyAccount />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/parcels/:id" element={<ParcelDetail />} />
           <Route

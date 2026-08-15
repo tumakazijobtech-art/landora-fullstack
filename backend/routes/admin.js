@@ -1,12 +1,50 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Parcel = require('../models/Parcel');
+const AuthSettings = require('../models/AuthSettings');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const cache = require('../middleware/cache');
 
 const router = express.Router();
 
 router.use(requireAuth, requireRole('admin'));
+
+router.get('/auth-settings', async (req, res) => {
+  const settings = await AuthSettings.getSingleton();
+  res.json({
+    settings: {
+      requireVerificationOnSignup: settings.requireVerificationOnSignup,
+      requireVerificationOnSignIn: settings.requireVerificationOnSignIn,
+    },
+  });
+});
+
+router.patch(
+  '/auth-settings',
+  [
+    body('requireVerificationOnSignup').optional().isBoolean(),
+    body('requireVerificationOnSignIn').optional().isBoolean(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    const settings = await AuthSettings.getSingleton();
+    if (req.body.requireVerificationOnSignup !== undefined) {
+      settings.requireVerificationOnSignup = req.body.requireVerificationOnSignup;
+    }
+    if (req.body.requireVerificationOnSignIn !== undefined) {
+      settings.requireVerificationOnSignIn = req.body.requireVerificationOnSignIn;
+    }
+    await settings.save();
+    res.json({
+      settings: {
+        requireVerificationOnSignup: settings.requireVerificationOnSignup,
+        requireVerificationOnSignIn: settings.requireVerificationOnSignIn,
+      },
+    });
+  }
+);
 
 // Admin: every listing, any status/owner, most recent first.
 router.get('/parcels', async (req, res) => {

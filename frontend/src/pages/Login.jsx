@@ -17,6 +17,10 @@ export default function Login() {
     setSubmitting(true);
     try {
       const data = await api.login({ email, password });
+      if (data.requiresVerification) {
+        navigate(`/verify?email=${encodeURIComponent(email)}&purpose=signin`, { state: { email, purpose: 'signin' } });
+        return;
+      }
       login(data.token, data.user);
       navigate(data.user.role === 'landowner' ? '/dashboard' : '/marketplace');
     } catch (err) {
@@ -47,8 +51,9 @@ export default function Login() {
             {submitting ? 'Logging in…' : 'Log in'}
           </button>
         </form>
-        <div style={{ marginTop: 16, fontSize: 13, color: 'var(--s500)' }}>
-          New to Landora? <Link to="/register">Create an account</Link>
+        <div className="auth-links">
+          <Link to="/forgot-password">Forgot password?</Link>
+          <span>New to Landora? <Link to="/register">Create an account</Link></span>
         </div>
       </div>
     </div>
