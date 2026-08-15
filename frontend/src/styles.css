@@ -247,8 +247,8 @@ table.data-table td{padding:12px;border-bottom:1px solid var(--s100)}
 .stat-label{font-size:10px;letter-spacing:0.6px;text-transform:uppercase;color:var(--s500);margin-bottom:4px}
 .stat-value{font-weight:700;color:var(--s900);font-size:14px;margin-bottom:3px}
 .stat-note{font-size:12px;color:var(--s500);line-height:1.4}
-.rainfall-bars{display:flex;gap:10px;align-items:flex-end;height:100px}
-.rainfall-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
+.rainfall-bars{display:flex;gap:10px;align-items:flex-end;height:100px;overflow-x:auto;padding-bottom:2px}
+.rainfall-bar-wrap{flex:0 0 44px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
 .rainfall-bar{width:100%;border-radius:6px 6px 0 0;height:70%}
 .rainfall-bar.ok{background:#4A90C4}
 .rainfall-bar.flag{background:#C0553E}
@@ -393,3 +393,95 @@ table.data-table td{padding:12px;border-bottom:1px solid var(--s100)}
   .auth-card{padding:26px 20px}
   .toggle-row{align-items:flex-start}
 }
+
+/* ---------- Parcel detail page (redesigned, listing site inspired layout) ---------- */
+.parcel-detail-section{padding-top:26px}
+.parcel-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.parcel-breadcrumb{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--s500)}
+.parcel-breadcrumb a{color:var(--s500);text-decoration:none}
+.parcel-breadcrumb a:hover{color:var(--g700)}
+.crumb-sep{color:var(--s200)}
+.parcel-topbar-actions{display:flex;gap:8px}
+.icon-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--s200);background:var(--w);color:var(--s700);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s}
+.icon-btn:hover{background:var(--g50);border-color:var(--g200);color:var(--g700)}
+
+.parcel-title-row{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+.listing-tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:4px 10px;border-radius:5px;margin-bottom:10px}
+.listing-tag-available{background:var(--g100);color:var(--g700)}
+.listing-tag-leased{background:var(--s100);color:var(--s500)}
+.listing-tag-under_review{background:var(--o100);color:var(--o700)}
+.listing-tag-unlisted{background:var(--s100);color:var(--s500)}
+.parcel-h1{font-size:30px;font-weight:700;letter-spacing:-0.8px;color:var(--s900);margin-bottom:10px;line-height:1.2}
+.parcel-meta-line{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--s500)}
+.parcel-meta-line span{position:relative;padding-left:14px}
+.parcel-meta-line span:first-child{padding-left:0}
+.parcel-meta-line span:not(:first-child)::before{content:'';position:absolute;left:4px;top:7px;width:3px;height:3px;border-radius:50%;background:var(--s200)}
+.parcel-title-score{text-align:center;flex:none}
+.parcel-title-score-label{font-size:10.5px;color:var(--s500);margin-top:6px}
+
+/* Tabbed media viewer. The tab pattern is a familiar convention from land listing
+   sites, but everything shown inside is this project's own data, drawn by its own
+   components — no outside photography or map tiles are ever pulled in. */
+.media-tabs{margin-bottom:28px}
+.media-tabbar{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--s100);margin-bottom:14px;scrollbar-width:none}
+.media-tabbar::-webkit-scrollbar{display:none}
+.media-tab{flex:none;background:none;border:none;font-family:inherit;font-size:13.5px;font-weight:600;color:var(--s500);padding:10px 16px;cursor:pointer;border-bottom:2.5px solid transparent;transition:color 0.15s,border-color 0.15s;white-space:nowrap}
+.media-tab:hover{color:var(--g700)}
+.media-tab.active{color:var(--g700);border-color:var(--g700)}
+.media-tab-panel{background:var(--w);border-radius:var(--rlg);border:1px solid var(--s100);padding:12px;overflow:hidden}
+.media-map-frame{padding:8px}
+
+/* Local map tab: a decorative, procedurally drawn area overview, plain SVG in the
+   site's own palette. No external map tiles or imagery are used. */
+.local-map{display:flex;flex-direction:column;gap:14px}
+.local-map-svg{width:100%;height:auto;border-radius:var(--r);border:1px solid var(--s100);display:block;background:var(--g50)}
+.local-map-caption{padding:0 6px 4px}
+.local-map-place{font-weight:700;font-size:14px;color:var(--s900)}
+.local-map-coords{font-size:11.5px;color:var(--s400);margin-top:2px}
+.local-map-note{font-size:12.5px;color:var(--s500);margin-top:6px;line-height:1.5}
+
+/* Two column layout: the report content plus a sticky pricing and contact card,
+   similar in spirit to listing sites that keep the price and CTA visible while
+   you scroll through the evidence. */
+.parcel-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:26px;align-items:start}
+.parcel-main{min-width:0;display:flex;flex-direction:column;gap:24px}
+.parcel-sidebar{position:sticky;top:72px}
+.sidebar-card{background:var(--w);border:1px solid var(--s100);border-radius:var(--rlg);padding:22px;box-shadow:var(--shadow-sm)}
+.sidebar-price-label{font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--s500);margin-bottom:4px}
+.sidebar-price{font-size:22px;font-weight:800;color:var(--g700)}
+.sidebar-price span{font-size:12px;font-weight:500;color:var(--s400);display:block;margin-top:2px}
+.sidebar-divider{height:1px;background:var(--s100);margin:16px 0}
+.sidebar-rows{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.sidebar-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;gap:10px}
+.sidebar-row span{color:var(--s500)}
+.sidebar-row strong{color:var(--s900);text-align:right}
+.sidebar-bullets{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.sidebar-bullets li{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--s700);line-height:1.4}
+.sidebar-bullets li::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--g500);margin-top:5px;flex:none}
+.sidebar-owner{display:flex;align-items:center;gap:12px;padding:14px;background:var(--g50);border:1px solid var(--g100);border-radius:var(--r);margin-bottom:16px}
+.sidebar-owner-avatar{width:40px;height:40px;border-radius:50%;background:var(--g700);color:var(--w);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:none}
+.sidebar-owner-name{font-weight:600;font-size:13.5px;color:var(--s900)}
+.sidebar-owner-sub{font-size:11.5px;color:var(--g700);margin-top:2px}
+.sidebar-cta-group{display:flex;flex-direction:column;gap:10px}
+.sidebar-cta-group .btn-green,.sidebar-cta-group .btn-outline-green{width:100%;text-align:center}
+.sidebar-note{font-size:11.5px;color:var(--s400);margin-top:14px;text-align:center}
+
+@media (max-width:960px){
+  .parcel-layout{grid-template-columns:1fr}
+  .parcel-sidebar{position:static}
+}
+@media (max-width:600px){
+  .parcel-h1{font-size:24px}
+  .sidebar-card{padding:18px}
+}
+
+/* ---------- Admin: editable rainfall history rows (add, remove, relabel seasons) ---------- */
+.rainfall-editor-list{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.rainfall-editor-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rainfall-year-input{border:1px solid var(--s200);border-radius:var(--rsm);padding:7px 10px;font-family:inherit;font-size:13px;color:var(--s900);background:var(--w);width:110px}
+.rainfall-year-input:focus{outline:none;border-color:var(--g500)}
+.rainfall-editor-row label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--s700);margin:0}
+.rainfall-remove-btn{background:none;border:1px solid var(--s200);color:var(--s500);width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;flex:none}
+.rainfall-remove-btn:hover{border-color:#F3C6BC;color:#A3392A}
+.rainfall-add-btn{align-self:flex-start;background:var(--g50);border:1px dashed var(--g200);color:var(--g700);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:var(--rsm);cursor:pointer;font-family:inherit}
+.rainfall-add-btn:hover{background:var(--g100)}

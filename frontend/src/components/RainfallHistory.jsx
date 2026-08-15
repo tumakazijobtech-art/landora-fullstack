@@ -15,7 +15,7 @@ export default function RainfallHistory({ seasons = [] }) {
         ))}
       </div>
       <div className="info-box" style={{ marginTop: 12, marginBottom: 0 }}>
-        Rainfall has stayed within the insurable band for {insurableCount} of the last {seasons.length} long rains seasons at this coordinate.
+        Rainfall has stayed within the insurable band for {insurableCount} of the {seasons.length} long rains seasons shown here, at this coordinate.
       </div>
     </div>
   );

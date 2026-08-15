@@ -94,10 +94,22 @@ export default function AdminParcelEditor() {
   function updateMetric(field, value) {
     setReport((r) => ({ ...r, metrics: { ...r.metrics, [field]: value === '' ? undefined : Number(value) } }));
   }
-  function updateRainfall(index, insurable) {
+  function updateRainfallField(index, field, value) {
     setReport((r) => ({
       ...r,
-      rainfallHistory: r.rainfallHistory.map((s, i) => (i === index ? { ...s, insurable } : s)),
+      rainfallHistory: r.rainfallHistory.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
+    }));
+  }
+  function addRainfallSeason() {
+    setReport((r) => ({
+      ...r,
+      rainfallHistory: [...r.rainfallHistory, { season: '', insurable: true }],
+    }));
+  }
+  function removeRainfallSeason(index) {
+    setReport((r) => ({
+      ...r,
+      rainfallHistory: r.rainfallHistory.filter((_, i) => i !== index),
     }));
   }
   function updateVideo(field, value) {
@@ -431,15 +443,37 @@ export default function AdminParcelEditor() {
               </div>
 
               <div className="field">
-                <label>Five-season rainfall history — mark each season within the insurable band</label>
-                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <label>Rainfall history. Edit the year labels, mark each season within the insurable band, and add or remove seasons to cover whichever range of years you want to show.</label>
+                <div className="rainfall-editor-list">
                   {report.rainfallHistory.map((s, i) => (
-                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                      <input type="checkbox" checked={s.insurable} onChange={(e) => updateRainfall(i, e.target.checked)} />
-                      {s.season}
-                    </label>
+                    <div className="rainfall-editor-row" key={i}>
+                      <input
+                        type="text"
+                        className="rainfall-year-input"
+                        value={s.season}
+                        placeholder="e.g. 2026"
+                        onChange={(e) => updateRainfallField(i, 'season', e.target.value)}
+                      />
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={s.insurable}
+                          onChange={(e) => updateRainfallField(i, 'insurable', e.target.checked)}
+                        />
+                        Within insurable band
+                      </label>
+                      <button
+                        type="button"
+                        className="rainfall-remove-btn"
+                        onClick={() => removeRainfallSeason(i)}
+                        aria-label={`Remove ${s.season || 'this season'}`}
+                      >
+                        ×
+                      </button>
+                    </div>
                   ))}
                 </div>
+                <button type="button" className="rainfall-add-btn" onClick={addRainfallSeason}>+ Add a season</button>
               </div>
 
               <div className="field"><label>Agronomic notes</label><textarea rows={4} value={report.agronomicNotes || ''} onChange={(e) => updateReport('agronomicNotes', e.target.value)} /></div>
