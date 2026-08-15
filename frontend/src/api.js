@@ -36,19 +36,11 @@ export const api = {
     ).toString();
     return request(`/parcels${qs ? `?${qs}` : ''}`);
   },
-  getLandUseOptions: () => request('/parcels/options/land-use'),
   getParcel: (id) => request(`/parcels/${id}`),
   createParcel: (payload, token) => request('/parcels', { method: 'POST', body: payload, token }),
   updateParcel: (id, payload, token) => request(`/parcels/${id}`, { method: 'PATCH', body: payload, token }),
   deleteParcel: (id, token) => request(`/parcels/${id}`, { method: 'DELETE', token }),
   myParcels: (token) => request('/parcels/mine/list', { token }),
-  adminListParcels: (token, params = {}) => {
-    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null))).toString();
-    return request(`/admin/parcels${qs ? `?${qs}` : ''}`, { token });
-  },
-  adminUpdateParcel: (id, payload, token) => request(`/admin/parcels/${id}`, { method: 'PATCH', body: payload, token }),
-  adminGetOptions: (token) => request('/admin/options', { token }),
-  adminAddLandUseOption: (payload, token) => request('/admin/options', { method: 'POST', body: payload, token }),
 
   applyToParcel: (payload, token) => request('/applications', { method: 'POST', body: payload, token }),
   myApplications: (token) => request('/applications/mine', { token }),
@@ -57,4 +49,20 @@ export const api = {
     request(`/applications/received${parcelId ? `?parcelId=${parcelId}` : ''}`, { token }),
   decideApplication: (id, payload, token) =>
     request(`/applications/${id}/decision`, { method: 'PATCH', body: payload, token }),
+
+  // Land use taxonomy — adaptable via the admin backend, powers the crop/land-use
+  // dropdowns on listing creation, marketplace filters, and Landora Match.
+  landUses: () => request('/land-uses'),
+  allLandUses: (token) => request('/land-uses/all', { token }),
+  createLandUse: (payload, token) => request('/land-uses', { method: 'POST', body: payload, token }),
+  updateLandUse: (id, payload, token) => request(`/land-uses/${id}`, { method: 'PATCH', body: payload, token }),
+  deleteLandUse: (id, token) => request(`/land-uses/${id}`, { method: 'DELETE', token }),
+
+  // Admin: listing management, including the internal key-facts/productivity-report/
+  // map/video-walkthrough enrichment pass.
+  adminParcels: (token) => request('/admin/parcels', { token }),
+  adminGetParcel: (id, token) => request(`/admin/parcels/${id}`, { token }),
+  adminUpdateParcel: (id, payload, token) => request(`/admin/parcels/${id}`, { method: 'PATCH', body: payload, token }),
+  adminEnrichParcel: (id, payload, token) => request(`/admin/parcels/${id}/enrich`, { method: 'PATCH', body: payload, token }),
+  adminDeleteParcel: (id, token) => request(`/admin/parcels/${id}`, { method: 'DELETE', token }),
 };

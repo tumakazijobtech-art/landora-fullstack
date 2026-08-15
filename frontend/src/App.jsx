@@ -12,13 +12,16 @@ import ParcelDetail from './pages/ParcelDetail.jsx';
 import CreateParcel from './pages/CreateParcel.jsx';
 import LandownerDashboard from './pages/LandownerDashboard.jsx';
 import FarmerDashboard from './pages/FarmerDashboard.jsx';
-import Match from './pages/Match.jsx';
-import Admin from './pages/Admin.jsx';
+import AdminDashboard from './pages/AdminDashboard.jsx';
+import AdminParcelEditor from './pages/AdminParcelEditor.jsx';
+import AdminLandUses from './pages/AdminLandUses.jsx';
 
 function Dashboard() {
   const { user } = useAuth();
   if (!user) return null;
-  return user.role === 'landowner' ? <LandownerDashboard /> : <FarmerDashboard />;
+  if (user.role === 'landowner') return <LandownerDashboard />;
+  if (user.role === 'admin') return <AdminDashboard />;
+  return <FarmerDashboard />;
 }
 
 export default function App() {
@@ -30,7 +33,6 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/marketplace" element={<Marketplace />} />
-        <Route path="/match" element={<Match />} />
         <Route path="/parcels/:id" element={<ParcelDetail />} />
         <Route
           path="/parcels/new"
@@ -48,7 +50,30 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/admin" element={<ProtectedRoute role="admin"><Admin /></ProtectedRoute>} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute role="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/land-uses"
+          element={
+            <ProtectedRoute role="admin">
+              <AdminLandUses />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/parcels/:id"
+          element={
+            <ProtectedRoute role="admin">
+              <AdminParcelEditor />
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Home />} />
       </Routes>
     </>

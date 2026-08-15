@@ -1,93 +1,122 @@
 const express = require('express');
-const { body, query, validationResult } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 const Parcel = require('../models/Parcel');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { getLandUseOptions } = require('../config/options');
-const Setting = require('../models/Setting');
 
 const router = express.Router();
+
 router.use(requireAuth, requireRole('admin'));
 
-router.get(
-  '/parcels',
-  [query('status').optional().trim(), query('search').optional().trim()],
-  async (req, res) => {
-    const filter = {};
-    if (req.query.status && req.query.status !== 'all') filter.status = req.query.status;
-    if (req.query.search) {
-      filter.$or = [
-        { title: { $regex: req.query.search, $options: 'i' } },
-        { reference: { $regex: req.query.search, $options: 'i' } },
-        { county: { $regex: req.query.search, $options: 'i' } },
-      ];
-    }
-
-    const parcels = await Parcel.find(filter)
-      .sort({ updatedAt: -1 })
-      .populate('owner', 'name email phone county')
-      .lean();
-    res.json({ parcels });
-  }
-);
-
-router.get('/options', async (req, res) => {
-  res.json({ landUseOptions: await getLandUseOptions() });
+// Admin: every listing, any status/owner, most recent first.
+router.get('/parcels', async (req, res) => {
+  const parcels = await Parcel.find({}).sort({ createdAt: -1 }).populate('owner', 'name email county');
+  res.json({ parcels });
 });
 
-router.post(
-  '/options',
-  [body('label').trim().isLength({ min: 2, max: 80 })],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+router.get('/parcels/:id', async (req, res) => {
+  const parcel = await Parcel.findById(req.params.id).populate('owner', 'name email phone county');
+  if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+  res.json({ parcel });
+});
 
-    const label = req.body.label.trim();
-    const setting = await Setting.findOneAndUpdate(
-      { key: 'landUseOptions' },
-      { $setOnInsert: { values: [] } },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-    if (!setting.values.includes(label)) {
-      setting.values.push(label);
-      await setting.save();
-    }
-    res.status(201).json({ landUseOptions: setting.values });
-  }
-);
-
+// Admin: full edit of any listing field, including the base fields a landowner
+// submitted (title, price, photos, etc). Use PATCH /parcels/:id/enrich for the
+// GIS/key-facts/video pass specifically.
 router.patch('/parcels/:id', async (req, res) => {
   const parcel = await Parcel.findById(req.params.id);
   if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
-  const allowed = [
-    'title', 'reference', 'county', 'location', 'sizeAcres', 'pricePerAcrePerSeason',
-    'crop', 'landUse', 'season', 'description', 'tags', 'photos', 'financingAvailable',
-    'insured', 'status', 'plotRating', 'matchScore', 'keyFacts', 'keyFactsVerified',
-    'keyFactsVerifiedBy', 'gisReportStatus', 'parcelMapUrl', 'parcelMapSource', 'videoUrl',
-    'ministryVerification',
+  const editable = [
+    'title', 'reference', 'county', 'location', 'sizeAcres', 'totalAcres', 'pricePerAcrePerSeason',
+    'crop', 'season', 'tags', 'description', 'photos', 'financingAvailable', 'insured', 'waterAccess',
+    'status', 'score',
   ];
-
-  for (const field of allowed) {
-    if (req.body[field] === undefined) continue;
-    if (field === 'photos') parcel[field] = Array.isArray(req.body[field]) ? req.body[field].slice(0, 6) : [];
-    else if (field === 'keyFacts') {
-      parcel[field] = Array.isArray(req.body[field])
-        ? req.body[field].filter((fact) => fact && fact.label && fact.value).slice(0, 20)
-        : [];
-    } else if (field === 'ministryVerification') {
-      parcel[field] = {
-        ...parcel.ministryVerification?.toObject?.(),
-        ...req.body[field],
-        checkedAt: req.body[field].checkedAt || parcel.ministryVerification?.checkedAt,
-      };
-    } else parcel[field] = req.body[field];
+  editable.forEach((field) => {
+    if (req.body[field] !== undefined) parcel[field] = req.body[field];
+  });
+  if (Array.isArray(parcel.photos) && parcel.photos.length > 6) {
+    parcel.photos = parcel.photos.slice(0, 6);
   }
 
-  if (parcel.keyFactsVerified && !parcel.keyFactsVerifiedBy) {
-    parcel.keyFactsVerifiedBy = 'GIS Engine + human intelligence';
-  }
   await parcel.save();
   res.json({ parcel });
+});
+
+// Admin: the internal enrichment pass — verified key facts, the GIS productivity
+// report (including the parcel map), and the video walkthrough. This is the "second
+// part" that gets added after a landowner submits a listing via the website.
+router.patch(
+  '/parcels/:id/enrich',
+  [
+    body('score').optional({ checkFalsy: true }).trim().isLength({ max: 4 }),
+    body('keyFacts').optional().isObject(),
+    body('titleVerification').optional().isObject(),
+    body('productivityReport').optional().isObject(),
+    body('mapData').optional().isObject(),
+    body('videoWalkthrough').optional().isObject(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: errors.array()[0].msg });
+    }
+
+    const parcel = await Parcel.findById(req.params.id);
+    if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+
+    const { score, keyFacts, titleVerification, productivityReport, mapData, videoWalkthrough, markEnriched } = req.body;
+
+    if (score !== undefined) parcel.score = score;
+
+    if (keyFacts) {
+      parcel.keyFacts = { ...(parcel.keyFacts ? parcel.keyFacts.toObject() : {}), ...keyFacts };
+    }
+    if (titleVerification) {
+      // A title/identity check just got recorded (via Ardhisasa or a manual search) —
+      // default it to "verified" unless the admin explicitly set another status
+      // (e.g. flagged pending discrepancies, or left pending for a follow-up).
+      parcel.titleVerification = {
+        ...(parcel.titleVerification ? parcel.titleVerification.toObject() : {}),
+        ...titleVerification,
+        status: titleVerification.status || 'verified',
+        checkedBy: req.user.name,
+        checkedAt: new Date(),
+      };
+    }
+    if (productivityReport) {
+      parcel.productivityReport = {
+        ...(parcel.productivityReport ? parcel.productivityReport.toObject() : {}),
+        ...productivityReport,
+        generatedAt: new Date(),
+      };
+    }
+    if (mapData) {
+      parcel.mapData = { ...(parcel.mapData ? parcel.mapData.toObject() : {}), ...mapData };
+    }
+    if (videoWalkthrough) {
+      parcel.videoWalkthrough = {
+        ...(parcel.videoWalkthrough ? parcel.videoWalkthrough.toObject() : {}),
+        ...videoWalkthrough,
+        addedAt: new Date(),
+      };
+    }
+
+    if (markEnriched !== false) {
+      parcel.enrichmentStatus = 'enriched';
+      parcel.enrichedBy = req.user.name;
+      parcel.enrichedAt = new Date();
+    }
+
+    await parcel.save();
+    res.json({ parcel });
+  }
+);
+
+router.delete('/parcels/:id', async (req, res) => {
+  const parcel = await Parcel.findById(req.params.id);
+  if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+  await parcel.deleteOne();
+  res.json({ ok: true });
 });
 
 module.exports = router;

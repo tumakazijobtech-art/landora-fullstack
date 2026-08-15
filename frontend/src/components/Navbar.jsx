@@ -1,55 +1,75 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [open, setOpen] = React.useState(false);
-  React.useEffect(() => {
-    const close = (e) => e.key === 'Escape' && setOpen(false);
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+
+  // Close the mobile menu on route change and on resize back up to desktop width.
+  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth > 760) setOpen(false);
+    }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   function handleLogout() {
     logout();
+    setOpen(false);
     navigate('/');
   }
 
   return (
     <nav>
-      <Link className="nav-brand" to="/" onClick={() => setOpen(false)}>
-        <img className="nav-logo" src="/assets/landora-icon.svg" alt="Landora" />
+      <Link className="nav-brand" to="/">
+        <div className="nav-logo">L</div>
         <div className="nav-name">Landora</div>
       </Link>
-      <button className="nav-toggle" aria-label={open ? 'Close navigation' : 'Open navigation'} aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className="hamburger-lines" aria-hidden="true"><i /><i /><i /></span>
+
+      <button
+        className={`nav-hamburger ${open ? 'open' : ''}`}
+        aria-label={open ? 'Close menu' : 'Open menu'}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span />
+        <span />
+        <span />
       </button>
-      <div className={`nav-links ${open ? 'is-open' : ''}`}>
-        <Link className="nav-link" onClick={() => setOpen(false)} to="/marketplace">Browse land</Link>
-        <Link className="nav-link" onClick={() => setOpen(false)} to="/match">Landora Match</Link>
+
+      <div className={`nav-links ${open ? 'nav-links-open' : ''}`}>
+        <Link className="nav-link" to="/marketplace">Browse land</Link>
         {user && user.role === 'landowner' && (
-          <Link className="nav-link" onClick={() => setOpen(false)} to="/dashboard">My listings</Link>
+          <Link className="nav-link" to="/dashboard">My listings</Link>
         )}
         {user && user.role === 'farmer' && (
-          <Link className="nav-link" onClick={() => setOpen(false)} to="/dashboard">My applications</Link>
+          <Link className="nav-link" to="/dashboard">My applications</Link>
         )}
         {user && user.role === 'admin' && (
-          <Link className="nav-link" onClick={() => setOpen(false)} to="/admin">Review console</Link>
+          <>
+            <Link className="nav-link" to="/admin">Admin listings</Link>
+            <Link className="nav-link" to="/admin/land-uses">Land uses</Link>
+          </>
         )}
         {!user && (
           <>
-            <Link className="nav-link" onClick={() => setOpen(false)} to="/login">Log in</Link>
-            <Link className="nav-cta" onClick={() => setOpen(false)} to="/register">Get started</Link>
+            <Link className="nav-link" to="/login">Log in</Link>
+            <Link className="nav-cta" to="/register">Get started</Link>
           </>
         )}
         {user && (
           <button className="nav-link" onClick={handleLogout} style={{ cursor: 'pointer' }}>
-            Log out ({user.name?.split(' ')[0] || 'account'})
+            Log out ({user.name.split(' ')[0]})
           </button>
         )}
       </div>
+
+      {open && <div className="nav-scrim" onClick={() => setOpen(false)} />}
     </nav>
   );
 }

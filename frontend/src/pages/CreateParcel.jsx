@@ -7,19 +7,23 @@ const TAG_OPTIONS = ['Financing', 'Insured', 'River access', 'Road access', 'Bor
 
 const EMPTY = {
   title: '', reference: '', county: '', location: '', sizeAcres: '', pricePerAcrePerSeason: '',
-  crop: '', season: '', landUse: '', description: '', photos: '', tags: [], financingAvailable: false, insured: false,
+  crop: '', season: '', description: '', photos: '', tags: [],
+  financingAvailable: false, insured: false, waterAccess: false,
 };
 
 export default function CreateParcel() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState(EMPTY);
+  const [landUses, setLandUses] = useState([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [landUseOptions, setLandUseOptions] = useState([]);
 
   useEffect(() => {
-    api.getLandUseOptions().then((data) => setLandUseOptions(data.options || [])).catch(() => {});
+    api.landUses().then((data) => {
+      setLandUses(data.landUses);
+      if (data.landUses.length > 0) setForm((f) => ({ ...f, crop: f.crop || data.landUses[0].name }));
+    }).catch(() => setLandUses([]));
   }, []);
 
   function update(field, value) {
@@ -33,16 +37,22 @@ export default function CreateParcel() {
     }));
   }
 
+  const photoCount = form.photos.split(',').map((s) => s.trim()).filter(Boolean).length;
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    if (photoCount > 6) {
+      setError('You can add up to 6 photos per listing.');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
         ...form,
         sizeAcres: parseFloat(form.sizeAcres),
         pricePerAcrePerSeason: parseFloat(form.pricePerAcrePerSeason),
-        photos: form.photos.split(',').map((s) => s.trim()).filter(Boolean),
+        photos: form.photos.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 6),
       };
       await api.createParcel(payload, token);
       navigate('/dashboard');
@@ -59,6 +69,11 @@ export default function CreateParcel() {
         <div className="section-eyebrow">List your land</div>
         <h2 className="section-h2">New parcel listing</h2>
         <div className="panel" style={{ maxWidth: 640 }}>
+          <div className="info-box">
+            Once you publish, our GIS engine and field team verify the parcel and add the key facts,
+            productivity report, boundary map, and a video walkthrough — usually within a few days.
+            You'll see those appear on your listing automatically.
+          </div>
           {error && <div className="error-box">{error}</div>}
           <form onSubmit={handleSubmit}>
             <div className="field-group">
@@ -76,11 +91,6 @@ export default function CreateParcel() {
                   <input required value={form.location} onChange={(e) => update('location', e.target.value)} />
                 </div>
               </div>
-              <div className="field">
-                <label>Land use</label>
-                <input list="land-use-options" value={form.landUse} onChange={(e) => update('landUse', e.target.value)} placeholder="e.g. crop farming, grazing" />
-                <datalist id="land-use-options">{landUseOptions.map((option) => <option key={option} value={option} />)}</datalist>
-              </div>
               <div className="field-row">
                 <div className="field">
                   <label>Size (acres)</label>
@@ -93,8 +103,11 @@ export default function CreateParcel() {
               </div>
               <div className="field-row">
                 <div className="field">
-                  <label>Crop</label>
-                  <input required value={form.crop} onChange={(e) => update('crop', e.target.value)} placeholder="e.g. Maize" />
+                  <label>Land use</label>
+                  <select required value={form.crop} onChange={(e) => update('crop', e.target.value)}>
+                    {landUses.length === 0 && <option value="">No land uses configured yet</option>}
+                    {landUses.map((lu) => <option key={lu._id} value={lu.name}>{lu.name}</option>)}
+                  </select>
                 </div>
                 <div className="field">
                   <label>Season</label>
@@ -102,13 +115,15 @@ export default function CreateParcel() {
                 </div>
               </div>
               <div className="field">
-                <label>Parcel reference (optional)</label>
+                <label>Parcel reference (optional — we'll generate one if left blank)</label>
                 <input value={form.reference} onChange={(e) => update('reference', e.target.value)} />
               </div>
-              <div className="info-box">You only need to provide the basics here. GIS evidence, verified key facts and a walkthrough video are added during Landora’s internal review.</div>
               <div className="field">
-                <label>Photo URLs (comma separated, optional)</label>
+                <label>Photo URLs, comma separated (up to 6 — these auto-slide on your listing)</label>
                 <input value={form.photos} onChange={(e) => update('photos', e.target.value)} placeholder="https://..., https://..." />
+                <div style={{ fontSize: 12, color: photoCount > 6 ? '#A3392A' : 'var(--s500)', marginTop: 4 }}>
+                  {photoCount} / 6 photos
+                </div>
               </div>
               <div className="field">
                 <label>Description</label>
@@ -135,6 +150,10 @@ export default function CreateParcel() {
               <div className="checkbox-row">
                 <input type="checkbox" checked={form.insured} onChange={(e) => update('insured', e.target.checked)} id="insured" />
                 <label htmlFor="insured" style={{ margin: 0 }}>Insurance available for this parcel</label>
+              </div>
+              <div className="checkbox-row">
+                <input type="checkbox" checked={form.waterAccess} onChange={(e) => update('waterAccess', e.target.checked)} id="waterAccess" />
+                <label htmlFor="waterAccess" style={{ margin: 0 }}>This parcel has water access</label>
               </div>
             </div>
             <button className="btn-green" type="submit" disabled={submitting}>

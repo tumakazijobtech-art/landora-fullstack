@@ -9,6 +9,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth');
 const parcelRoutes = require('./routes/parcels');
 const applicationRoutes = require('./routes/applications');
+const landUseRoutes = require('./routes/landUses');
 const adminRoutes = require('./routes/admin');
 
 const app = express();
@@ -17,7 +18,7 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '1mb' }));
 
-const allowedOrigins = (process.env.CORS_ORIGINS || 'https://landora-frontend.vercel.app/')
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim());
 
@@ -48,6 +49,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/parcels', parcelRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/land-uses', landUseRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));

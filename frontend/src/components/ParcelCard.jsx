@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import ScoreBadge from './ScoreBadge.jsx';
 
 export default function ParcelCard({ parcel }) {
   return (
@@ -9,15 +10,20 @@ export default function ParcelCard({ parcel }) {
           <img className="parcel-photo" src={parcel.photos[0]} alt={parcel.title} loading="lazy" />
         ) : null}
         {parcel.season && <span className="parcel-badge-top">{parcel.season}</span>}
-        {parcel.matchScore != null && <span className="parcel-score-top">{Math.round(parcel.matchScore)}% match</span>}
+        {parcel.score && (
+          <span className="parcel-score-top">
+            <ScoreBadge score={parcel.score} size="xs" />
+          </span>
+        )}
       </div>
       <div className="parcel-body">
-        <div className="parcel-location">{parcel.location || 'Kenya'}, {parcel.county || 'County'}</div>
+        <div className="parcel-location">{parcel.location}, {parcel.county}</div>
         <div className="parcel-name">{parcel.title}</div>
         <div className="parcel-tags">
           <span className="parcel-tag">{parcel.sizeAcres} ac</span>
           <span className="parcel-tag">{parcel.crop}</span>
-          {parcel.plotRating != null && <span className="parcel-tag">Rating {Number(parcel.plotRating).toFixed(1)}/5</span>}
+          {parcel.financingAvailable && <span className="parcel-tag">Financing</span>}
+          {parcel.insured && <span className="parcel-tag">Insured</span>}
           {(parcel.tags || []).map((t) => (
             <span className="parcel-tag" key={t}>{t}</span>
           ))}
@@ -26,7 +32,7 @@ export default function ParcelCard({ parcel }) {
           <div className="parcel-price">
             KES {Number(parcel.pricePerAcrePerSeason).toLocaleString()} <span>per ac per season</span>
           </div>
-          <span className="parcel-btn">View details</span>
+          <span className="parcel-btn">View parcel</span>
         </div>
       </div>
     </Link>
