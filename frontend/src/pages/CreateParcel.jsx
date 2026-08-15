@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import PricingCalculator from '../components/PricingCalculator.jsx';
 
 const TAG_OPTIONS = ['Financing', 'Insured', 'River access', 'Road access', 'Borehole', 'Export zone'];
 
@@ -9,6 +10,7 @@ const EMPTY = {
   title: '', reference: '', county: '', location: '', sizeAcres: '', pricePerAcrePerSeason: '',
   crop: '', season: '', description: '', photos: '', tags: [],
   financingAvailable: false, insured: false, waterAccess: false,
+  leaseDeadline: '', preBookingEnabled: true,
 };
 
 export default function CreateParcel() {
@@ -101,6 +103,15 @@ export default function CreateParcel() {
                   <input required type="number" step="1" min="0" value={form.pricePerAcrePerSeason} onChange={(e) => update('pricePerAcrePerSeason', e.target.value)} />
                 </div>
               </div>
+
+              <PricingCalculator
+                county={form.county}
+                crop={form.crop}
+                waterAccess={form.waterAccess}
+                financingAvailable={form.financingAvailable}
+                onApply={(price) => update('pricePerAcrePerSeason', String(price))}
+              />
+
               <div className="field-row">
                 <div className="field">
                   <label>Land use</label>
@@ -112,6 +123,25 @@ export default function CreateParcel() {
                 <div className="field">
                   <label>Season</label>
                   <input value={form.season} onChange={(e) => update('season', e.target.value)} placeholder="e.g. Long rains 2026" />
+                </div>
+              </div>
+              <div className="field-row">
+                <div className="field">
+                  <label>Planting season deadline</label>
+                  <input
+                    type="date"
+                    value={form.leaseDeadline}
+                    onChange={(e) => update('leaseDeadline', e.target.value)}
+                  />
+                  <div style={{ fontSize: 12, color: 'var(--s500)', marginTop: 4 }}>
+                    Optional. The listing comes off the board on its own once this date passes.
+                  </div>
+                </div>
+                <div className="field" style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <input type="checkbox" checked={form.preBookingEnabled} onChange={(e) => update('preBookingEnabled', e.target.checked)} />
+                    Allow pre booking ahead of the next season
+                  </label>
                 </div>
               </div>
               <div className="field">

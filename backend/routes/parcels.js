@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body, query, validationResult } = require('express-validator');
 const Parcel = require('../models/Parcel');
 const Application = require('../models/Application');
@@ -13,6 +14,37 @@ const TAGS_ALLOWED = ['Financing', 'Insured', 'River access', 'Road access', 'Bo
 const LIST_TTL_MS = 30 * 1000; // marketplace list/match results change as fast as listings do
 const DETAIL_TTL_MS = 60 * 1000; // a single parcel page is read far more than it's edited
 
+// Listings don't get pulled the moment someone applies — accepting is what takes a
+// parcel off the market (see routes/admin.js). Instead the marketplace card and
+// listing page show how many people have applied, to create urgency without ever
+// hiding a parcel that's still actually open. This attaches an `applicantCount` to
+// each parcel in a list.
+async function withApplicantCounts(parcels) {
+  const ids = parcels.map((p) => p._id);
+  if (ids.length === 0) return parcels;
+  const counts = await Application.aggregate([
+    { $match: { parcel: { $in: ids }, status: { $ne: 'withdrawn' } } },
+    { $group: { _id: '$parcel', count: { $sum: 1 } } },
+  ]);
+  const countMap = Object.fromEntries(counts.map((c) => [c._id.toString(), c.count]));
+  return parcels.map((p) => ({ ...p, applicantCount: countMap[p._id.toString()] || 0 }));
+}
+
+// A listing's leaseDeadline is a planting season cutoff, not a hard delete — once it
+// passes we lazily flip status from "available" to "unlisted" the next time anyone
+// reads the marketplace, rather than running a cron job. The parcel stays fully
+// intact (and still pre bookable, see preBookingEnabled) for the next season.
+async function expireDeadlines() {
+  await Parcel.updateMany(
+    { status: 'available', leaseDeadline: { $ne: null, $lt: new Date() } },
+    { $set: { status: 'unlisted' } }
+  );
+}
+
+function isObjectId(value) {
+  return mongoose.Types.ObjectId.isValid(value) && String(new mongoose.Types.ObjectId(value)) === String(value);
+}
+
 // Public: browse/search/filter listings, including the Landora Match engine filters
 // (near/within, land use, acreage band, budget ceiling, water access). Only ever
 // returns real, landowner-created parcels.
@@ -25,7 +57,7 @@ function scoreMatch(parcel, criteria) {
   const parts = []; // { weight, score, reason }
 
   if (crop) {
-    const isMatch = parcel.crop === crop;
+    const isMatch = String(parcel.crop || '').trim().toLowerCase() === String(crop).trim().toLowerCase();
     parts.push({
       weight: 25,
       score: isMatch ? 100 : 35,
@@ -166,6 +198,8 @@ router.get(
     const limit = parseInt(req.query.limit, 10) || 12;
     const isMatchMode = match === 'true';
 
+    await expireDeadlines();
+
     const filter = { status: 'available' };
     if (minScore) filter.score = minScore;
     if (search) filter.$text = { $search: search };
@@ -173,14 +207,16 @@ router.get(
     if (isMatchMode) {
       // Landora Match acts as a recommender: don't hard-exclude parcels that are
       // merely an imperfect fit — rank everything available by how well it scores
-      // against what was asked for instead.
+      // against what was asked for instead. Only the criteria the person actually
+      // filled in are weighed, so the ranking is genuinely dynamic per submission
+      // rather than a fixed formula everyone gets the same result from.
       const origin = near ? countyCentroid(near) : null;
       const radiusKm = withinKm ? parseFloat(withinKm) : null;
 
       const parcels = await Parcel.find(filter).populate('owner', 'name county profilePicture');
-      const ranked = parcels
-        .map((p) => {
-          const plain = p.toObject();
+      const withCounts = await withApplicantCounts(parcels.map((p) => p.toObject()));
+      const ranked = withCounts
+        .map((plain) => {
           const { matchScore, matchReasons } = scoreMatch(plain, {
             crop, minSize, maxSize, maxPrice, waterAccess, origin, radiusKm,
           });
@@ -234,17 +270,94 @@ router.get(
     }
 
     const start = (page - 1) * limit;
-    const pageItems = parcels.slice(start, start + limit);
+    const pageItems = await withApplicantCounts(parcels.slice(start, start + limit).map((p) => p.toObject()));
 
     res.json({ parcels: pageItems, total, page, pages: Math.ceil(total / limit) || 1 });
   }
 );
 
-// Public: single parcel detail.
-router.get('/:id', cache.cacheGet(DETAIL_TTL_MS), async (req, res) => {
-  const parcel = await Parcel.findById(req.params.id).populate('owner', 'name county phone profilePicture');
+// Suggests a fair lease rate range for a landowner who is still setting their price,
+// based on what similar parcels (same crop, then same county, then the whole
+// marketplace as a fallback) are actually listed at right now — a small, real
+// recommender rather than a fixed lookup table.
+router.get(
+  '/pricing-suggestion',
+  [
+    query('county').optional().trim(),
+    query('crop').optional().trim(),
+    query('sizeAcres').optional().isFloat({ min: 0 }),
+    query('waterAccess').optional().isBoolean(),
+    query('financingAvailable').optional().isBoolean(),
+  ],
+  async (req, res) => {
+    const { county, crop, waterAccess, financingAvailable } = req.query;
+
+    async function pricesFor(filter) {
+      const rows = await Parcel.find(filter).select('pricePerAcrePerSeason').limit(200);
+      return rows.map((r) => r.pricePerAcrePerSeason).filter((n) => typeof n === 'number' && n > 0);
+    }
+
+    let prices = [];
+    let basis = 'marketplace-wide';
+    if (county && crop) {
+      prices = await pricesFor({ county, crop });
+      if (prices.length >= 3) basis = 'same county and land use';
+    }
+    if (prices.length < 3 && crop) {
+      prices = await pricesFor({ crop });
+      if (prices.length >= 3) basis = 'same land use, all counties';
+    }
+    if (prices.length < 3 && county) {
+      prices = await pricesFor({ county });
+      if (prices.length >= 3) basis = 'same county, all land uses';
+    }
+    if (prices.length < 3) {
+      prices = await pricesFor({});
+      basis = 'marketplace-wide';
+    }
+
+    if (prices.length === 0) {
+      return res.json({
+        available: false,
+        message: 'Not enough listings yet to suggest a rate. Price competitively against nearby land for now.',
+      });
+    }
+
+    prices.sort((a, b) => a - b);
+    const mid = Math.floor(prices.length / 2);
+    const median = prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid];
+
+    // Modest adjustments for factors that reliably move a fair rate: on site water
+    // access and offering financing both make a parcel more attractive, so they
+    // support a slightly higher ask.
+    let adjustment = 1;
+    if (waterAccess === 'true') adjustment += 0.06;
+    if (financingAvailable === 'true') adjustment += 0.03;
+
+    const suggestedMin = Math.round((median * 0.88 * adjustment) / 50) * 50;
+    const suggestedMax = Math.round((median * 1.15 * adjustment) / 50) * 50;
+
+    res.json({
+      available: true,
+      basis,
+      sampleSize: prices.length,
+      median: Math.round(median),
+      suggestedMin,
+      suggestedMax,
+    });
+  }
+);
+
+// Public: single parcel detail. Accepts either the Mongo id or the readable slug, so
+// every link keeps working, and returns 404 (not a crash) when neither resolves.
+router.get('/:idOrSlug', cache.cacheGet(DETAIL_TTL_MS), async (req, res) => {
+  await expireDeadlines();
+  const { idOrSlug } = req.params;
+  const lookup = isObjectId(idOrSlug) ? { _id: idOrSlug } : { slug: idOrSlug };
+  const parcel = await Parcel.findOne(lookup).populate('owner', 'name county phone profilePicture');
   if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
-  res.json({ parcel });
+  const [withCount] = await withApplicantCounts([parcel.toObject()]);
+  res.json({ parcel: withCount });
 });
 
 // Landowner: create a listing. This is the "part one" submission — key facts, the
@@ -270,6 +383,8 @@ router.post(
     body('financingAvailable').optional().isBoolean(),
     body('insured').optional().isBoolean(),
     body('waterAccess').optional().isBoolean(),
+    body('leaseDeadline').optional({ checkFalsy: true }).isISO8601(),
+    body('preBookingEnabled').optional().isBoolean(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -280,6 +395,7 @@ router.post(
     const {
       title, county, location, sizeAcres, totalAcres, pricePerAcrePerSeason, crop, season,
       reference, description, tags, photos, financingAvailable, insured, waterAccess,
+      leaseDeadline, preBookingEnabled,
     } = req.body;
 
     const cleanTags = Array.isArray(tags) ? tags.filter((t) => TAGS_ALLOWED.includes(t)) : [];
@@ -296,6 +412,8 @@ router.post(
       financingAvailable: !!financingAvailable,
       insured: !!insured,
       waterAccess: !!waterAccess,
+      leaseDeadline: leaseDeadline || null,
+      preBookingEnabled: preBookingEnabled !== false,
       enrichmentStatus: 'pending',
     });
 
@@ -330,6 +448,7 @@ router.patch('/:id', requireAuth, requireRole('landowner'), async (req, res) => 
   const editable = [
     'title', 'county', 'location', 'sizeAcres', 'totalAcres', 'pricePerAcrePerSeason', 'crop', 'season',
     'reference', 'description', 'tags', 'photos', 'financingAvailable', 'insured', 'waterAccess', 'status',
+    'leaseDeadline', 'preBookingEnabled',
   ];
   editable.forEach((field) => {
     if (req.body[field] !== undefined) parcel[field] = req.body[field];

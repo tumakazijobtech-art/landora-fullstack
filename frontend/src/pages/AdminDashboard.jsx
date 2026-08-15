@@ -115,6 +115,100 @@ function ApplicationsPanel({ token }) {
   );
 }
 
+// Admin: every "Join the waitlist" popup submission and every parcel pre booking,
+// most recent first. This is the admin console side of the waitlist popup feature —
+// every entry lands here the moment it's submitted, independent of whether email
+// delivery is configured.
+function WaitlistPanel({ token }) {
+  const [entries, setEntries] = useState([]);
+  const [typeFilter, setTypeFilter] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+
+  function load(type) {
+    setLoading(true);
+    return api.adminWaitlist(token, type ? { type } : {})
+      .then((data) => setEntries(data.entries))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    load(typeFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeFilter]);
+
+  async function setStatus(id, status) {
+    setBusyId(id);
+    setError('');
+    try {
+      await api.adminUpdateWaitlistEntry(id, { status }, token);
+      await load(typeFilter);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="filter-bar">
+        <span className={`filter-badge ${typeFilter === '' ? 'active' : ''}`} onClick={() => setTypeFilter('')}>All ({entries.length})</span>
+        <span className={`filter-badge ${typeFilter === 'general' ? 'active' : ''}`} onClick={() => setTypeFilter('general')}>Waitlist</span>
+        <span className={`filter-badge ${typeFilter === 'prebooking' ? 'active' : ''}`} onClick={() => setTypeFilter('prebooking')}>Pre bookings</span>
+      </div>
+      {error && <div className="error-box">{error}</div>}
+      {loading ? (
+        <div className="empty-state">Loading…</div>
+      ) : entries.length === 0 ? (
+        <div className="empty-state">No submissions yet.</div>
+      ) : (
+        <div className="panel" style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th><th>Contact</th><th>County</th><th>Interest</th><th>Type</th><th>Status</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry._id}>
+                  <td>{entry.name}</td>
+                  <td>
+                    <div>{entry.email}</div>
+                    {entry.phone && <div style={{ fontSize: 11, color: 'var(--s400)' }}>{entry.phone}</div>}
+                  </td>
+                  <td>{entry.county || '—'}</td>
+                  <td>
+                    {entry.cropInterest || '—'}
+                    {entry.parcel && <div style={{ fontSize: 11, color: 'var(--s400)' }}>{entry.parcel.title}</div>}
+                  </td>
+                  <td><span className={`status-pill ${entry.type === 'prebooking' ? 'status-pending' : ''}`}>{entry.type}</span></td>
+                  <td><span className={`status-pill ${entry.status === 'converted' ? 'status-accepted' : entry.status === 'dismissed' ? 'status-declined' : 'status-pending'}`}>{entry.status}</span></td>
+                  <td>
+                    <select
+                      value={entry.status}
+                      disabled={busyId === entry._id}
+                      onChange={(e) => setStatus(entry._id, e.target.value)}
+                    >
+                      <option value="new">New</option>
+                      <option value="contacted">Contacted</option>
+                      <option value="converted">Converted</option>
+                      <option value="dismissed">Dismissed</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { token } = useAuth();
   const [tab, setTab] = useState('listings');
@@ -163,7 +257,7 @@ export default function AdminDashboard() {
           <div>
             <div className="section-eyebrow">Admin</div>
             <h2 className="section-h2" style={{ marginBottom: 0 }}>
-              {tab === 'listings' ? 'All listings' : 'Applicant qualification'}
+              {tab === 'listings' ? 'All listings' : tab === 'applications' ? 'Applicant qualification' : 'Waitlist and pre bookings'}
             </h2>
           </div>
           <Link className="btn-outline-green" to="/admin/land-uses">Manage land uses</Link>
@@ -176,12 +270,17 @@ export default function AdminDashboard() {
           <button type="button" className={`admin-tab ${tab === 'applications' ? 'active' : ''}`} onClick={() => setTab('applications')}>
             Applications
           </button>
+          <button type="button" className={`admin-tab ${tab === 'waitlist' ? 'active' : ''}`} onClick={() => setTab('waitlist')}>
+            Waitlist
+          </button>
         </div>
 
         {error && <div className="error-box">{error}</div>}
 
         {tab === 'applications' ? (
           <ApplicationsPanel token={token} />
+        ) : tab === 'waitlist' ? (
+          <WaitlistPanel token={token} />
         ) : (
           <>
             {authSettings && (

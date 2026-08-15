@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import ScoreBadge from './ScoreBadge.jsx';
 import WishlistButton from './WishlistButton.jsx';
+import CountdownTimer, { ApplicantCount } from './UrgencyBadges.jsx';
 
 function matchTier(score) {
   if (score >= 80) return 'match-high';
@@ -30,6 +31,7 @@ export default function ParcelCard({ parcel }) {
   const [flipped, setFlipped] = useState(false);
   const hasMatch = typeof parcel.matchScore === 'number';
   const highlights = parcel.highlights || [];
+  const linkTo = `/parcels/${parcel.slug || parcel._id}`;
 
   function toggleFlip(e) {
     e.preventDefault();
@@ -41,7 +43,7 @@ export default function ParcelCard({ parcel }) {
     <div className={`parcel-card-flip ${flipped ? 'is-flipped' : ''}`}>
       <div className="parcel-card-flip-inner">
         {/* ---- Front face: photo, price, quick tags ---- */}
-        <Link className="parcel-card parcel-card-face parcel-card-front" to={`/parcels/${parcel._id}`}>
+        <Link className="parcel-card parcel-card-face parcel-card-front" to={linkTo}>
           <div className="parcel-img">
             {parcel.photos && parcel.photos[0] ? (
               <img className="parcel-photo" src={parcel.photos[0]} alt={parcel.title} loading="lazy" />
@@ -87,11 +89,20 @@ export default function ParcelCard({ parcel }) {
               </div>
             )}
 
+            {(parcel.applicantCount > 0 || parcel.leaseDeadline) && (
+              <div className="urgency-row">
+                <ApplicantCount count={parcel.applicantCount} />
+                <CountdownTimer deadline={parcel.leaseDeadline} compact />
+              </div>
+            )}
+
             <div className="parcel-footer">
               <div className="parcel-price">
                 KES {Number(parcel.pricePerAcrePerSeason).toLocaleString()} <span>per ac per season</span>
               </div>
-              <span className="parcel-btn">View parcel</span>
+              <span className="parcel-btn">
+                {parcel.status === 'available' ? 'View parcel' : parcel.preBookingEnabled ? 'Pre book' : 'View parcel'}
+              </span>
             </div>
           </div>
         </Link>
@@ -108,7 +119,7 @@ export default function ParcelCard({ parcel }) {
               <li key={i}>{h}</li>
             ))}
           </ul>
-          <Link className="parcel-btn parcel-back-cta" to={`/parcels/${parcel._id}`}>See full listing</Link>
+          <Link className="parcel-btn parcel-back-cta" to={linkTo}>See full listing</Link>
         </div>
       </div>
     </div>

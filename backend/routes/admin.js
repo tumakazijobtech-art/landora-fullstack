@@ -3,6 +3,7 @@ const { body, query, validationResult } = require('express-validator');
 const Parcel = require('../models/Parcel');
 const Application = require('../models/Application');
 const AuthSettings = require('../models/AuthSettings');
+const WaitlistEntry = require('../models/WaitlistEntry');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const cache = require('../middleware/cache');
 
@@ -69,7 +70,7 @@ router.patch('/parcels/:id', async (req, res) => {
   const editable = [
     'title', 'reference', 'county', 'location', 'sizeAcres', 'totalAcres', 'pricePerAcrePerSeason',
     'crop', 'season', 'tags', 'description', 'photos', 'financingAvailable', 'insured', 'waterAccess',
-    'status', 'score',
+    'status', 'score', 'leaseDeadline', 'preBookingEnabled',
   ];
   editable.forEach((field) => {
     if (req.body[field] !== undefined) parcel[field] = req.body[field];
@@ -231,5 +232,29 @@ router.patch(
     cache.invalidate('/api/parcels');
   }
 );
+
+// Admin: every waitlist / pre booking submission, most recent first. This is what
+// makes the "join the waitlist" popup and a parcel's "pre book" CTA reflect straight
+// into the admin console, on top of the admin notification email.
+router.get('/waitlist', async (req, res) => {
+  const filter = {};
+  if (req.query.type && ['general', 'prebooking'].includes(req.query.type)) filter.type = req.query.type;
+  if (req.query.status) filter.status = req.query.status;
+  const entries = await WaitlistEntry.find(filter)
+    .sort({ createdAt: -1 })
+    .populate('parcel', 'title county location season slug');
+  res.json({ entries });
+});
+
+router.patch('/waitlist/:id', [body('status').isIn(['new', 'contacted', 'converted', 'dismissed'])], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+  const entry = await WaitlistEntry.findById(req.params.id);
+  if (!entry) return res.status(404).json({ error: 'Waitlist entry not found' });
+  entry.status = req.body.status;
+  await entry.save();
+  res.json({ entry });
+});
 
 module.exports = router;

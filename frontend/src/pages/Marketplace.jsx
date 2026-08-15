@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import ParcelCard from '../components/ParcelCard.jsx';
 import LandoraMatch from '../components/LandoraMatch.jsx';
+import WaitlistModal from '../components/WaitlistModal.jsx';
+import AIAgentWidget from '../components/AIAgentWidget.jsx';
 import { COUNTIES } from '../constants.js';
 
 const DEFAULT_FILTERS = {
@@ -16,6 +18,7 @@ export default function Marketplace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [matchOpen, setMatchOpen] = useState(false);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   const isMatchMode = filters.match === 'true';
 
@@ -96,7 +99,7 @@ export default function Marketplace() {
                     : 'No parcels to rank yet'}
               </div>
               <div className="match-header-sub">
-                Each parcel below is scored on land use, budget, acreage, distance, water access, and its GIS plot
+                Each parcel below is scored on land use, budget, acreage, distance, water access and its GIS plot
                 rating — the closer to 100%, the better the fit.
               </div>
             </div>
@@ -164,9 +167,19 @@ export default function Marketplace() {
             <ParcelCard key={p._id} parcel={p} />
           ))}
         </div>
+
+        <div className="marketplace-waitlist-cta">
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Not finding the right parcel yet?</div>
+            <div style={{ fontSize: 13, color: 'var(--s500)' }}>Join the waitlist and we will notify you the moment a match is listed.</div>
+          </div>
+          <button className="btn-outline-green" onClick={() => setWaitlistOpen(true)}>Join the waitlist</button>
+        </div>
       </div>
 
       <LandoraMatch open={matchOpen} onClose={() => setMatchOpen(false)} onMatch={handleMatch} />
+      <WaitlistModal open={waitlistOpen} onClose={() => setWaitlistOpen(false)} />
+      <AIAgentWidget />
     </div>
   );
 }

@@ -140,6 +140,8 @@ export default function AdminParcelEditor() {
         financingAvailable: !!base.financingAvailable,
         insured: !!base.insured,
         waterAccess: !!base.waterAccess,
+        leaseDeadline: base.leaseDeadline || null,
+        preBookingEnabled: base.preBookingEnabled !== false,
       }, token);
 
       await api.adminEnrichParcel(id, {
@@ -281,6 +283,18 @@ export default function AdminParcelEditor() {
               <div className="field"><label>Description</label><textarea rows={3} value={base.description || ''} onChange={(e) => updateBase('description', e.target.value)} /></div>
               <div className="field-row">
                 <div className="field"><label>Season</label><input value={base.season || ''} onChange={(e) => updateBase('season', e.target.value)} placeholder="e.g. Long rains 2026" /></div>
+                <div className="field">
+                  <label>Planting season deadline</label>
+                  <input
+                    type="date"
+                    value={base.leaseDeadline ? String(base.leaseDeadline).slice(0, 10) : ''}
+                    onChange={(e) => updateBase('leaseDeadline', e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="checkbox-row">
+                <input type="checkbox" id="adminPreBooking" checked={base.preBookingEnabled !== false} onChange={(e) => updateBase('preBookingEnabled', e.target.checked)} />
+                <label htmlFor="adminPreBooking" style={{ margin: 0 }}>Allow pre booking ahead of the next season</label>
               </div>
               <div className="field">
                 <label>Photo URLs, comma separated (up to 6 — these auto-slide on the listing)</label>

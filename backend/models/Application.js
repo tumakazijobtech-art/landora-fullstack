@@ -8,6 +8,13 @@ const applicationSchema = new mongoose.Schema(
     intendedCrop: { type: String, trim: true, maxlength: 80 },
     seasonsRequested: { type: Number, min: 1, max: 20, default: 1 },
     message: { type: String, trim: true, maxlength: 2000 },
+    // "lease" is a normal application against a currently available listing.
+    // "prebooking" is a farmer reserving a parcel ahead of a future season, before
+    // the listing is necessarily open for applications yet.
+    type: { type: String, enum: ['lease', 'prebooking'], default: 'lease' },
+    applicantName: { type: String, trim: true, maxlength: 120 },
+    applicantPhone: { type: String, trim: true, maxlength: 20 },
+    preferredSeason: { type: String, trim: true, maxlength: 40 },
     status: {
       type: String,
       enum: ['pending', 'accepted', 'declined', 'withdrawn'],

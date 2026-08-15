@@ -16,6 +16,10 @@ router.post(
     body('intendedCrop').optional({ checkFalsy: true }).trim().isLength({ max: 80 }),
     body('seasonsRequested').optional().isInt({ min: 1, max: 20 }),
     body('message').optional({ checkFalsy: true }).trim().isLength({ max: 2000 }),
+    body('type').optional().isIn(['lease', 'prebooking']),
+    body('applicantName').optional({ checkFalsy: true }).trim().isLength({ max: 120 }),
+    body('applicantPhone').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('preferredSeason').optional({ checkFalsy: true }).trim().isLength({ max: 40 }),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -23,12 +27,29 @@ router.post(
       return res.status(400).json({ error: errors.array()[0].msg });
     }
 
-    const { parcelId, intendedCrop, seasonsRequested, message } = req.body;
+    const {
+      parcelId, intendedCrop, seasonsRequested, message, type,
+      applicantName, applicantPhone, preferredSeason,
+    } = req.body;
+    const applicationType = type === 'prebooking' ? 'prebooking' : 'lease';
 
     const parcel = await Parcel.findById(parcelId);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
-    if (parcel.status !== 'available') {
-      return res.status(400).json({ error: 'This parcel is not currently accepting applications' });
+
+    if (applicationType === 'lease') {
+      if (parcel.status !== 'available') {
+        return res.status(400).json({ error: 'This parcel is not currently accepting applications' });
+      }
+    } else {
+      // Pre booking is meant to work ahead of a season even before a listing is
+      // marked "available" — the only thing that rules it out is the parcel already
+      // being leased, or the landowner having switched pre booking off.
+      if (parcel.status === 'leased') {
+        return res.status(400).json({ error: 'This parcel has already been leased' });
+      }
+      if (parcel.preBookingEnabled === false) {
+        return res.status(400).json({ error: 'Pre booking is not open for this parcel' });
+      }
     }
 
     try {
@@ -39,6 +60,10 @@ router.post(
         intendedCrop,
         seasonsRequested,
         message,
+        type: applicationType,
+        applicantName,
+        applicantPhone,
+        preferredSeason,
       });
       res.status(201).json({ application });
     } catch (err) {

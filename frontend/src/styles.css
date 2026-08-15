@@ -207,7 +207,7 @@ table.data-table td{padding:12px;border-bottom:1px solid var(--s100)}
 .btn-match:hover{background:var(--o400)}
 .filter-badge-pill.active{background:var(--g700);color:var(--w);border-color:var(--g700)}
 
-.modal-scrim{position:fixed;inset:0;background:rgba(13,43,20,0.5);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;z-index:300;overflow-y:auto}
+.modal-scrim{position:fixed;inset:0;background:rgba(13,43,20,0.5);display:flex;align-items:center;justify-content:center;padding:6vh 16px;z-index:300;overflow-y:auto}
 .modal-panel{background:var(--w);border-radius:var(--rlg);padding:28px;max-width:520px;width:100%;position:relative;box-shadow:var(--shadow-md)}
 .modal-close{position:absolute;top:14px;right:14px;background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--s500);width:30px;height:30px}
 .match-icon{width:34px;height:34px;border-radius:9px;background:var(--g700);color:var(--w);display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:12px}
@@ -559,4 +559,84 @@ table.data-table td{padding:12px;border-bottom:1px solid var(--s100)}
   .bottom-nav-item.active{color:var(--g700);background:var(--g50)}
   .bottom-nav-item svg{flex:none}
   .bottom-nav-avatar{width:21px;height:21px;border-radius:50%;object-fit:cover;display:block}
+}
+
+/* ---------- Hero trust badges + flippable report card ---------- */
+.hero-trust-label{margin-top:30px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--s500)}
+.hero-light .hero-trust-label{color:var(--s500)}
+.hero-trust-badges{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;max-width:480px}
+.hero-trust-chip{display:inline-flex;align-items:center;gap:7px;background:var(--w);border:1px solid var(--s100);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--s700);box-shadow:0 1px 2px rgba(13,43,20,.04)}
+
+.hero-report-flip{background:none;border:none;padding:0;cursor:pointer;perspective:1600px;width:100%;display:block;font-family:inherit;text-align:left}
+.hero-report-flip-inner{position:relative;width:100%;min-height:360px;transition:transform .6s cubic-bezier(.22,1,.36,1);transform-style:preserve-3d}
+.hero-report-flip.is-flipped .hero-report-flip-inner{transform:rotateY(180deg)}
+.hero-report-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.hero-report-front{position:relative}
+.hero-report-back{transform:rotateY(180deg);background:linear-gradient(160deg,var(--g800),var(--g600));color:#fff;display:flex;flex-direction:column;border-radius:22px;padding:26px;box-shadow:0 30px 70px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12)}
+.hero-report-back-eyebrow{font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--o400);margin-bottom:10px}
+.hero-report-back-title{font-size:21px;font-weight:700;margin-bottom:10px}
+.hero-report-back-sub{font-size:13px;line-height:1.6;color:rgba(255,255,255,.78);margin-bottom:18px}
+.hero-report-back-list{list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:12px}
+.hero-report-back-list li{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.4;color:#fff}
+.hero-report-back-note{margin-top:auto;font-size:11px;color:rgba(255,255,255,.6)}
+.hero-report-tap{margin-top:14px;text-align:center;font-size:11.5px;font-weight:600;color:var(--g600);cursor:pointer}
+
+/* ---------- Share menu ---------- */
+.share-menu{position:relative;display:inline-flex}
+.share-menu-panel{position:absolute;top:calc(100% + 8px);right:0;background:var(--w);border:1px solid var(--s100);border-radius:14px;box-shadow:var(--shadow-md);padding:8px;min-width:190px;z-index:60;display:flex;flex-direction:column;gap:2px}
+.share-menu-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;color:var(--s700);text-decoration:none;background:none;border:none;font-family:inherit;cursor:pointer;text-align:left;width:100%}
+.share-menu-item:hover{background:var(--g50);color:var(--g700)}
+.share-toast{position:absolute;top:calc(100% + 8px);right:0;background:var(--g800);color:#fff;font-size:12px;padding:7px 12px;border-radius:8px;white-space:nowrap;z-index:70}
+
+/* ---------- Urgency: applicant count + countdown ---------- */
+.urgency-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:8px 0}
+.urgency-applicants{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--o600);background:var(--o100);padding:5px 10px;border-radius:999px}
+.urgency-applicants-md{font-size:12.5px;padding:6px 12px}
+.urgency-timer{display:inline-flex;align-items:center;gap:5px}
+.urgency-timer-compact{font-size:11.5px;font-weight:700;color:var(--s600)}
+.urgency-timer-compact.urgent{color:#b3261e}
+.urgency-timer-block{background:var(--s50);border-radius:12px;padding:12px 14px;margin:10px 0}
+.urgency-timer-block.urgent{background:#fdecea}
+.urgency-timer-label{font-size:11px;color:var(--s500);margin-bottom:6px}
+.urgency-timer-value{display:flex;gap:12px;font-size:15px;font-weight:700;color:var(--g700)}
+.urgency-timer-block.urgent .urgency-timer-value{color:#b3261e}
+
+/* ---------- Multistep apply / pre book wizard ---------- */
+.apply-wizard-steps{display:flex;align-items:center;gap:8px;margin-bottom:18px}
+.apply-wizard-step{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--s400)}
+.apply-wizard-step-dot{width:22px;height:22px;border-radius:50%;background:var(--s100);color:var(--s500);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:none}
+.apply-wizard-step.active .apply-wizard-step-dot{background:var(--g600);color:#fff}
+.apply-wizard-step.active{color:var(--g700)}
+.apply-wizard-step.done .apply-wizard-step-dot{background:var(--g100);color:var(--g700)}
+.apply-wizard-step:not(:last-child)::after{content:'';width:16px;height:1px;background:var(--s200);margin-left:2px}
+.apply-wizard-review{background:var(--s50);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.kv-row{display:flex;justify-content:space-between;gap:16px;font-size:13px}
+.kv-row span{color:var(--s500)}
+.kv-row strong{text-align:right;color:var(--s800);font-weight:600}
+
+/* ---------- Landowner pricing calculator ---------- */
+.pricing-calculator{background:var(--g50);border:1px solid var(--g100);border-radius:14px;padding:16px;margin:6px 0 18px}
+.pricing-calculator-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.pricing-calculator-result{margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)}
+.pricing-calculator-range{font-size:17px;font-weight:800;color:var(--g700);margin-bottom:4px}
+.pricing-calculator-range span{font-size:11.5px;font-weight:500;color:var(--s500);margin-left:4px}
+
+/* ---------- AI Agent widget (marketplace) ---------- */
+.ai-agent-widget{position:fixed;right:20px;bottom:24px;z-index:200;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+.ai-agent-launcher{width:54px;height:54px;border-radius:50%;background:var(--g700);color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 10px 28px rgba(13,43,20,.35)}
+.ai-agent-panel{width:min(340px,86vw);background:var(--w);border-radius:16px;box-shadow:var(--shadow-md);overflow:hidden;display:flex;flex-direction:column;max-height:70vh}
+.ai-agent-head{background:var(--g700);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}
+.ai-agent-messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--s50)}
+.ai-agent-msg{font-size:13px;line-height:1.5;padding:9px 12px;border-radius:12px;max-width:88%}
+.ai-agent-msg-agent{background:var(--w);border:1px solid var(--s100);align-self:flex-start;color:var(--s700)}
+.ai-agent-msg-user{background:var(--g600);color:#fff;align-self:flex-end}
+.ai-agent-input-row{display:flex;gap:8px;padding:10px;border-top:1px solid var(--s100);background:var(--w)}
+.ai-agent-input-row textarea{flex:1;resize:none;border:1px solid var(--s100);border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13px}
+
+/* ---------- Marketplace waitlist CTA strip ---------- */
+.marketplace-waitlist-cta{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:var(--g50);border:1px solid var(--g100);border-radius:14px;padding:16px 20px;margin-top:28px}
+
+@media (max-width:640px){
+  .hero-report-flip-inner{min-height:400px}
+  .ai-agent-widget{right:14px;bottom:16px}
 }

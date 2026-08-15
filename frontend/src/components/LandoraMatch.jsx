@@ -3,8 +3,8 @@ import { api } from '../api.js';
 import { COUNTIES, WITHIN_OPTIONS } from '../constants.js';
 
 const EMPTY = {
-  near: 'Nairobi',
-  withinKm: '20',
+  near: '',
+  withinKm: '',
   minSize: '',
   maxSize: '',
   landUse: '',
@@ -57,6 +57,7 @@ export default function LandoraMatch({ open, onClose, onMatch }) {
             <div className="field">
               <label>Near</label>
               <select value={form.near} onChange={(e) => update('near', e.target.value)}>
+                <option value="">Any county</option>
                 {COUNTIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>

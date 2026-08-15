@@ -148,4 +148,22 @@ export const api = {
   },
   adminDecideApplication: (id, payload, token) =>
     request(`/admin/applications/${id}/decision`, { method: 'PATCH', body: payload, token }),
+
+  // Join the waitlist popup, and parcel level pre booking — public, no login needed.
+  joinWaitlist: (payload) => request('/waitlist', { method: 'POST', body: payload }),
+  adminWaitlist: (token, params = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return request(`/admin/waitlist${qs ? `?${qs}` : ''}`, { token });
+  },
+  adminUpdateWaitlistEntry: (id, payload, token) =>
+    request(`/admin/waitlist/${id}`, { method: 'PATCH', body: payload, token }),
+
+  // A fair lease rate suggestion for the landowner pricing calculator, based on what
+  // comparable listings are actually asking for right now.
+  pricingSuggestion: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null))
+    ).toString();
+    return request(`/parcels/pricing-suggestion${qs ? `?${qs}` : ''}`);
+  },
 };

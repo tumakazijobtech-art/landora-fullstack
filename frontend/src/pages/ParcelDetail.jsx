@@ -6,6 +6,10 @@ import MediaTabs from '../components/MediaTabs.jsx';
 import ScoreBadge from '../components/ScoreBadge.jsx';
 import RainfallHistory from '../components/RainfallHistory.jsx';
 import WishlistButton from '../components/WishlistButton.jsx';
+import ShareMenu from '../components/ShareMenu.jsx';
+import ApplyLeaseWizard from '../components/ApplyLeaseWizard.jsx';
+import WaitlistModal from '../components/WaitlistModal.jsx';
+import CountdownTimer, { ApplicantCount } from '../components/UrgencyBadges.jsx';
 
 const METRIC_LABELS = {
   soilQuality: 'Soil quality',
@@ -43,7 +47,7 @@ function initials(name) {
 
 export default function ParcelDetail() {
   const { id } = useParams();
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [parcel, setParcel] = useState(null);
@@ -51,11 +55,10 @@ export default function ParcelDetail() {
   const [loading, setLoading] = useState(true);
 
   const [applyOpen, setApplyOpen] = useState(false);
-  const [applyForm, setApplyForm] = useState({ intendedCrop: '', seasonsRequested: 1, message: '' });
-  const [applyError, setApplyError] = useState('');
+  const [applyType, setApplyType] = useState('lease');
   const [applySuccess, setApplySuccess] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [shareStatus, setShareStatus] = useState('');
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   const applyRef = useRef(null);
 
@@ -68,56 +71,23 @@ export default function ParcelDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  async function handleShare() {
-    const url = window.location.href;
-    const shareData = {
-      title: parcel ? `${parcel.title} · Landora` : 'Landora listing',
-      text: parcel ? `${parcel.title} — ${parcel.sizeAcres} acres in ${parcel.county} County, on Landora.` : 'Check out this listing on Landora.',
-      url,
-    };
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-        return;
-      }
-    } catch {
-      // User cancelled the native share sheet, or it's unsupported — fall through to copy.
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setShareStatus('Link copied to clipboard');
-    } catch {
-      setShareStatus(url);
-    }
-    setTimeout(() => setShareStatus(''), 3000);
-  }
-
-  function goToApply() {
+  function goToApply(type = 'lease') {
     if (!user) {
       navigate('/login');
       return;
     }
+    setApplyType(type);
     setApplyOpen(true);
     setTimeout(() => applyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
   }
 
-  async function handleApply(e) {
-    e.preventDefault();
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    setApplyError('');
-    setSubmitting(true);
-    try {
-      await api.applyToParcel({ parcelId: id, ...applyForm }, token);
-      setApplySuccess('Application sent. The landowner will review it and respond.');
-      setApplyOpen(false);
-    } catch (err) {
-      setApplyError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
+  function handleApplySuccess(application, type) {
+    setApplySuccess(
+      type === 'prebooking'
+        ? "You're booked in. We'll reach out as soon as this parcel opens for leasing."
+        : 'Application sent. The landowner will review it and respond.'
+    );
+    setApplyOpen(false);
   }
 
   if (loading) return <div className="section"><div className="section-inner">Loading…</div></div>;
@@ -130,6 +100,7 @@ export default function ParcelDetail() {
   const map = parcel.mapData;
   const video = parcel.videoWalkthrough;
   const canApply = parcel.status === 'available' && (!user || user.role === 'farmer');
+  const canPreBook = parcel.status !== 'available' && parcel.status !== 'leased' && parcel.preBookingEnabled !== false && (!user || user.role === 'farmer');
   const totalAcres = parcel.totalAcres || kf?.acreageTotal || parcel.sizeAcres;
 
   return (
@@ -143,9 +114,11 @@ export default function ParcelDetail() {
           </div>
           <div className="parcel-topbar-actions">
             <WishlistButton parcelId={parcel._id} variant="icon" />
-            <button type="button" className="icon-btn" title="Share this listing" aria-label="Share this listing" onClick={handleShare}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="18" cy="5" r="3" stroke="currentColor" strokeWidth="1.6"/><circle cx="6" cy="12" r="3" stroke="currentColor" strokeWidth="1.6"/><circle cx="18" cy="19" r="3" stroke="currentColor" strokeWidth="1.6"/><path d="M8.6 10.5L15.4 6.5M8.6 13.5L15.4 17.5" stroke="currentColor" strokeWidth="1.6"/></svg>
-            </button>
+            <ShareMenu
+              title={`${parcel.title} · Landora`}
+              text={`${parcel.title} in ${parcel.county} County on Landora.`}
+              url={window.location.href}
+            />
             {shareStatus && <span className="share-toast">{shareStatus}</span>}
           </div>
         </div>
@@ -162,6 +135,12 @@ export default function ParcelDetail() {
               {parcel.season && <span>{parcel.season}</span>}
               {parcel.location && <span>{parcel.location}</span>}
             </div>
+            {(parcel.applicantCount > 0 || parcel.leaseDeadline) && (
+              <div className="urgency-row" style={{ marginTop: 10 }}>
+                <ApplicantCount count={parcel.applicantCount} size="md" />
+                <CountdownTimer deadline={parcel.leaseDeadline} compact />
+              </div>
+            )}
           </div>
           {parcel.score && (
             <div className="parcel-title-score">
@@ -261,7 +240,7 @@ export default function ParcelDetail() {
                 <div className="card-title" style={{ fontSize: 16, marginBottom: 4 }}>Land productivity report</div>
                 <div style={{ fontSize: 13, color: 'var(--s500)', marginBottom: 16 }}>
                   Generated by the GIS and actuarial engine from rainfall records, vegetation indices, soil data, elevation
-                  models, and road network data. This is the same report the landowner received at listing.
+                  models and road network data. This is the same report the landowner received at listing.
                 </div>
 
                 {(pr.scoreLabel || parcel.score) && (
@@ -319,57 +298,42 @@ export default function ParcelDetail() {
               </div>
             )}
 
-            {canApply && (
+            {(canApply || canPreBook) && (
               <div className="panel" ref={applyRef}>
                 {applySuccess ? (
                   <div className="info-box" style={{ marginBottom: 0 }}>{applySuccess}</div>
                 ) : !applyOpen ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-                    <button className="btn-green" onClick={() => setApplyOpen(true)}>Apply to lease this parcel</button>
-                    <button className="btn-outline-green" onClick={() => setApplyOpen(true)}>Message the landowner</button>
+                    {canApply ? (
+                      <button className="btn-green" onClick={() => goToApply('lease')}>Apply to lease this parcel</button>
+                    ) : (
+                      <button className="btn-green" onClick={() => goToApply('prebooking')}>Pre book this parcel</button>
+                    )}
+                    <button className="btn-outline-green" onClick={() => setWaitlistOpen(true)}>Message the landowner</button>
                   </div>
                 ) : (
-                  <form onSubmit={handleApply}>
-                    <div className="card-title" style={{ fontSize: 16, marginBottom: 4 }}>Lease application</div>
-                    <div className="card-sub">Sent directly to the landowner for {parcel.title}.</div>
-                    {applyError && <div className="error-box">{applyError}</div>}
-                    <div className="field-group">
-                      <div className="field">
-                        <label>Intended crop</label>
-                        <input
-                          value={applyForm.intendedCrop}
-                          onChange={(e) => setApplyForm((f) => ({ ...f, intendedCrop: e.target.value }))}
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Seasons requested</label>
-                        <input
-                          type="number" min={1} max={20}
-                          value={applyForm.seasonsRequested}
-                          onChange={(e) => setApplyForm((f) => ({ ...f, seasonsRequested: parseInt(e.target.value, 10) || 1 }))}
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Message to landowner</label>
-                        <textarea
-                          rows={4}
-                          value={applyForm.message}
-                          onChange={(e) => setApplyForm((f) => ({ ...f, message: e.target.value }))}
-                        />
-                      </div>
+                  <>
+                    <div className="card-title" style={{ fontSize: 16, marginBottom: 4 }}>
+                      {applyType === 'prebooking' ? 'Pre book this parcel' : 'Lease application'}
                     </div>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <button className="btn-green" type="submit" disabled={submitting}>
-                        {submitting ? 'Sending…' : 'Send application'}
-                      </button>
-                      <button className="btn-outline-green" type="button" onClick={() => setApplyOpen(false)}>Cancel</button>
+                    <div className="card-sub">
+                      {applyType === 'prebooking'
+                        ? `Reserve ${parcel.title} ahead of its next season.`
+                        : `Sent directly to the landowner for ${parcel.title}.`}
                     </div>
-                  </form>
+                    <ApplyLeaseWizard
+                      parcel={parcel}
+                      user={user}
+                      type={applyType}
+                      onSuccess={handleApplySuccess}
+                      onCancel={() => setApplyOpen(false)}
+                    />
+                  </>
                 )}
                 {!applySuccess && (
                   <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--s100)' }}>
                     <div style={{ fontSize: 13, color: 'var(--s500)', marginBottom: 10 }}>Not ready to apply, or this parcel is not quite right?</div>
-                    <Link className="btn-outline-green" to="/marketplace">Join the land waitlist instead</Link>
+                    <button type="button" className="btn-outline-green" onClick={() => setWaitlistOpen(true)}>Join the land waitlist instead</button>
                   </div>
                 )}
               </div>
@@ -417,8 +381,16 @@ export default function ParcelDetail() {
 
               {canApply && !applySuccess && (
                 <div className="sidebar-cta-group">
-                  <button className="btn-green" onClick={goToApply}>Apply to lease this parcel</button>
-                  <button className="btn-outline-green" onClick={goToApply}>Message the landowner</button>
+                  <button className="btn-green" onClick={() => goToApply('lease')}>Apply to lease this parcel</button>
+                  <button className="btn-outline-green" onClick={() => setWaitlistOpen(true)}>Message the landowner</button>
+                </div>
+              )}
+              {canPreBook && !applySuccess && (
+                <div className="sidebar-cta-group">
+                  <button className="btn-green" onClick={() => goToApply('prebooking')}>Pre book this parcel</button>
+                  <div style={{ fontSize: 12, color: 'var(--s500)', marginTop: 8, textAlign: 'center' }}>
+                    Not currently listed for lease. Reserve your place for the next season.
+                  </div>
                 </div>
               )}
               {applySuccess && <div className="info-box" style={{ marginTop: 4, marginBottom: 0 }}>{applySuccess}</div>}
@@ -435,6 +407,7 @@ export default function ParcelDetail() {
           </aside>
         </div>
       </div>
+      <WaitlistModal open={waitlistOpen} onClose={() => setWaitlistOpen(false)} parcelId={null} parcelTitle={parcel.title} />
     </div>
   );
 }
