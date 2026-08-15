@@ -29,18 +29,16 @@ function getVideoEmbed(url) {
   return { type: 'file', src: url };
 }
 
-// Tabbed media viewer for a listing: Photos, Video, Property map, and Local map.
-// The tab bar pattern is a familiar one from land listing sites, but everything
-// rendered inside each tab is this project's own data and its own components
-// (the image slider, the SVG parcel map, the SVG local overview) — no outside
-// photography or map tiles are pulled in anywhere.
+// Tabbed media viewer for a listing: Photos (which opens with the video walkthrough
+// as its first slide when one exists), Property map, and Local map. Folding the
+// video into the photo slider means a visitor sees it while browsing rather than
+// needing to know a separate tab exists for it.
 export default function MediaTabs({ photos, altPrefix, video, posterFallback, map, county, location }) {
   const hasVideo = Boolean(video && video.url);
   const embed = hasVideo ? getVideoEmbed(video.url) : null;
 
   const tabs = [
     { key: 'photos', label: 'Photos' },
-    ...(hasVideo ? [{ key: 'video', label: 'Video' }] : []),
     { key: 'map', label: 'Property map' },
     { key: 'local', label: 'Local map' },
   ];
@@ -66,23 +64,12 @@ export default function MediaTabs({ photos, altPrefix, video, posterFallback, ma
       </div>
 
       <div className="media-tab-panel">
-        {current === 'photos' && <ImageSlider images={photos} altPrefix={altPrefix} />}
-
-        {current === 'video' && hasVideo && embed && (
-          <div className="video-frame">
-            {embed.type === 'iframe' ? (
-              <iframe
-                src={embed.src}
-                title={video.caption || 'Parcel video walkthrough'}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                frameBorder="0"
-              />
-            ) : (
-              <video controls poster={posterFallback} src={embed.src} />
-            )}
-            {video.durationLabel && <span className="video-duration">{video.durationLabel}</span>}
-          </div>
+        {current === 'photos' && (
+          <ImageSlider
+            images={photos}
+            altPrefix={altPrefix}
+            video={hasVideo ? { embed, poster: posterFallback, caption: video.caption, durationLabel: video.durationLabel } : null}
+          />
         )}
 
         {current === 'map' && (
@@ -97,10 +84,6 @@ export default function MediaTabs({ photos, altPrefix, video, posterFallback, ma
           </div>
         )}
       </div>
-
-      {current === 'video' && video?.caption && (
-        <div style={{ fontWeight: 600, fontSize: 13, marginTop: 10 }}>{video.caption}</div>
-      )}
     </div>
   );
 }

@@ -1,27 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-// Auto-slides through up to 6 parcel photos, pausing on hover/focus and while a
-// drag/swipe is in progress. Falls back to a single frame when there's only one photo.
-export default function ImageSlider({ images = [], altPrefix = 'Photo', captions = [], intervalMs = 4500 }) {
-  const photos = (images || []).slice(0, 6);
+// Auto-slides through the parcel video walkthrough (when there is one, always first)
+// and up to 6 photos, pausing on hover/focus and while a drag/swipe is in progress,
+// and while the video slide is showing (nobody wants an auto-advancing video). Falls
+// back to a single frame when there's only one item total.
+export default function ImageSlider({ images = [], altPrefix = 'Photo', captions = [], video = null, intervalMs = 4500 }) {
+  const photoSlides = (images || []).slice(0, 6).map((src, i) => ({ type: 'image', src, caption: captions[i] }));
+  const slides = video ? [{ type: 'video', ...video }, ...photoSlides] : photoSlides;
+
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef(null);
 
+  const onVideoSlide = slides[index]?.type === 'video';
+
   useEffect(() => {
-    if (photos.length < 2 || paused) return undefined;
+    if (slides.length < 2 || paused || onVideoSlide) return undefined;
     timerRef.current = setInterval(() => {
-      setIndex((i) => (i + 1) % photos.length);
+      setIndex((i) => (i + 1) % slides.length);
     }, intervalMs);
     return () => clearInterval(timerRef.current);
-  }, [photos.length, paused, intervalMs]);
+  }, [slides.length, paused, onVideoSlide, intervalMs]);
 
-  if (photos.length === 0) {
+  if (slides.length === 0) {
     return <div className="slider slider-empty" />;
   }
 
   function go(delta) {
-    setIndex((i) => (i + delta + photos.length) % photos.length);
+    setIndex((i) => (i + delta + slides.length) % slides.length);
   }
 
   return (
@@ -33,33 +39,55 @@ export default function ImageSlider({ images = [], altPrefix = 'Photo', captions
       onBlur={() => setPaused(false)}
     >
       <div className="slider-track" style={{ transform: `translateX(-${index * 100}%)` }}>
-        {photos.map((src, i) => (
+        {slides.map((slide, i) => (
           <div className="slider-slide" key={i}>
-            <img src={src} alt={`${altPrefix} ${i + 1}`} loading={i === 0 ? 'eager' : 'lazy'} />
+            {slide.type === 'video' ? (
+              <div className="slider-video-frame">
+                {slide.embed?.type === 'iframe' ? (
+                  <iframe
+                    src={slide.embed.src}
+                    title={slide.caption || 'Parcel video walkthrough'}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    frameBorder="0"
+                  />
+                ) : (
+                  <video controls poster={slide.poster} src={slide.embed?.src} />
+                )}
+                <span className="slider-video-badge">Video walkthrough{slide.durationLabel ? ` · ${slide.durationLabel}` : ''}</span>
+              </div>
+            ) : (
+              <img src={slide.src} alt={`${altPrefix} ${i + 1}`} loading={i === 0 ? 'eager' : 'lazy'} />
+            )}
           </div>
         ))}
       </div>
 
-      <div className="slider-counter">{index + 1} / {photos.length}</div>
+      <div className="slider-counter">{index + 1} / {slides.length}</div>
 
-      {photos.length > 1 && (
+      {slides.length > 1 && (
         <>
-          <button className="slider-arrow slider-arrow-left" onClick={() => go(-1)} aria-label="Previous photo">‹</button>
-          <button className="slider-arrow slider-arrow-right" onClick={() => go(1)} aria-label="Next photo">›</button>
+          <button className="slider-arrow slider-arrow-left" onClick={() => go(-1)} aria-label="Previous slide">‹</button>
+          <button className="slider-arrow slider-arrow-right" onClick={() => go(1)} aria-label="Next slide">›</button>
           <div className="slider-dots">
-            {photos.map((_, i) => (
+            {slides.map((s, i) => (
               <button
                 key={i}
-                className={`slider-dot ${i === index ? 'active' : ''}`}
+                className={`slider-dot ${i === index ? 'active' : ''} ${s.type === 'video' ? 'slider-dot-video' : ''}`}
                 onClick={() => setIndex(i)}
-                aria-label={`Go to photo ${i + 1}`}
+                aria-label={s.type === 'video' ? 'Go to video walkthrough' : `Go to photo ${i + 1}`}
               />
             ))}
           </div>
         </>
       )}
 
-      {captions[index] && <div className="slider-caption">{captions[index]}</div>}
+      {slides[index]?.type === 'image' && slides[index]?.caption && (
+        <div className="slider-caption">{slides[index].caption}</div>
+      )}
+      {slides[index]?.type === 'video' && slides[index]?.caption && (
+        <div className="slider-caption">{slides[index].caption}</div>
+      )}
     </div>
   );
 }
