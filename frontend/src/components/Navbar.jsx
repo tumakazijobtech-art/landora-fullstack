@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LOGO_URL } from '../constants.js';
+import useBranding from '../hooks/useBranding.js';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const { appLogoUrl } = useBranding();
 
   // Close the mobile menu on route change and on resize back up to desktop width.
   useEffect(() => setOpen(false), [location.pathname]);
@@ -29,7 +30,7 @@ export default function Navbar() {
     <nav>
       <div className="nav-inner">
         <Link className="nav-brand" to="/">
-          <img className="nav-logo" src={LOGO_URL} alt="Landora" width="32" height="32" />
+          <img className="nav-logo" src={appLogoUrl} alt="Landora" width="32" height="32" />
           <div className="nav-name">Landora</div>
         </Link>
 
@@ -75,7 +76,7 @@ export default function Navbar() {
                 {user.profilePicture ? (
                   <img className="nav-avatar" src={user.profilePicture} alt={user.name} />
                 ) : (
-                  <img className="nav-avatar nav-avatar-fallback" src={LOGO_URL} alt={user.name} />
+                  <img className="nav-avatar nav-avatar-fallback" src={appLogoUrl} alt={user.name} />
                 )}
                 <span className="nav-avatar-name">{user.name.split(' ')[0]}</span>
               </Link>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import useInView from '../hooks/useInView.js';
 
 // Five tabs mirror how a serious land listing gets explored in real life — wide shot,
 // walk the ground, watch it move, check the paper boundary, then check what's around
@@ -51,9 +52,11 @@ const TABS = [
 export default function LandoraTour() {
   const [active, setActive] = useState(0);
   const tab = TABS[active];
+  const [sectionRef, sectionInView] = useInView();
+  const [stageRef, stageInView] = useInView({ threshold: 0.35 });
 
   return (
-    <section className="tour-section">
+    <section className={`tour-section tour-reveal ${sectionInView ? 'in-view' : ''}`} ref={sectionRef}>
       <div className="section-inner">
         <div className="tour-heading">
           <div className="section-eyebrow">Take the short tour</div>
@@ -66,7 +69,7 @@ export default function LandoraTour() {
 
         {/* Clicking a tab is a real filter, not decoration — it swaps both the photo
             and the copy on the right to that exact section of the listing. */}
-        <div className="tour-laptop">
+        <div className={`tour-laptop tour-reveal tour-reveal-delayed ${stageInView ? 'in-view' : ''}`} ref={stageRef}>
           <div className="tour-device">
             <div className="tour-tabbar">
               {TABS.map((t, i) => (
@@ -83,7 +86,7 @@ export default function LandoraTour() {
 
             <div className="tour-stage">
               <div className="tour-stage-media">
-                <img src={tab.image} alt={tab.title} loading="lazy" />
+                <img key={tab.key} className="tour-stage-img" src={tab.image} alt={tab.title} loading="lazy" />
                 <div className="tour-stage-chip">{tab.chip}</div>
 
                 {tab.isVideo && (
@@ -93,7 +96,7 @@ export default function LandoraTour() {
                 )}
               </div>
 
-              <div className="tour-stage-info">
+              <div className="tour-stage-info" key={`${tab.key}-info`}>
                 <div className="tour-stage-eyebrow">{String(active + 1).padStart(2, '0')} / {String(TABS.length).padStart(2, '0')} · {tab.label}</div>
                 <h3>{tab.title}</h3>
                 <p>{tab.copy}</p>

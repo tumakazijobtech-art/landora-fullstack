@@ -28,18 +28,22 @@ export default function Home() {
       <div className="hero hero-light">
         <LightHeroBackground />
         <div className="hero-inner">
-          <h1 className="hero-h1">A simpler way to accessing <span className="hero-h1-accent">productive land</span></h1>
-          <p className="hero-sub">
+          <div className="hero-kicker reveal-up" style={{ '--d': '0s' }}>
+            <span className="hero-kicker-dot" />
+            Live across 10 Kenyan counties
+          </div>
+          <h1 className="hero-h1 reveal-up" style={{ '--d': '.08s' }}>A simpler way to accessing <span className="hero-h1-accent">productive land</span></h1>
+          <p className="hero-sub reveal-up" style={{ '--d': '.18s' }}>
             Landora makes it easier to find and secure agricultural land, with verified parcels,
             transparent pricing, secure digital leases, weather protection and the resources you
             need to make every season count.
           </p>
-          <div className="hero-actions">
+          <div className="hero-actions reveal-up" style={{ '--d': '.28s' }}>
             <Link className="btn-primary" to="/marketplace">Find land to farm</Link>
             {!user && <Link className="btn-ghost" to="/register">List your land</Link>}
           </div>
-          <div className="hero-trust-label">Why farmers and landowners trust us</div>
-          <div className="hero-trust-badges">
+          <div className="hero-trust-label reveal-up" style={{ '--d': '.36s' }}>Why farmers and landowners trust us</div>
+          <div className="hero-trust-badges reveal-up" style={{ '--d': '.42s' }}>
             <span className="hero-trust-chip"><CheckDot />Verified land titles only</span>
             <span className="hero-trust-chip"><ShieldDot />Weather protected leases</span>
             <span className="hero-trust-chip"><DocDot />Legally enforceable contracts</span>
@@ -51,7 +55,9 @@ export default function Home() {
             built as real markup (not a screenshot) so the numbers can change with the
             season without anyone touching an image file. Click or tap to flip it and see
             what actually feeds the score. */}
-        <div className="hero-visual">
+        <div className="hero-visual reveal-up" style={{ '--d': '.3s' }}>
+          <div className="hero-float-chip hero-float-chip-a" aria-hidden="true"><span className="hero-float-chip-dot" />128 parcels verified</div>
+          <div className="hero-float-chip hero-float-chip-b" aria-hidden="true"><span className="hero-float-chip-dot" />New listing in Nakuru</div>
           <button
             type="button"
             className={`hero-report-flip ${flipped ? 'is-flipped' : ''}`}

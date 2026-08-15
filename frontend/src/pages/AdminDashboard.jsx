@@ -2,6 +2,93 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { getBranding, getDefaultBranding, setBranding, resetBranding } from '../branding.js';
+
+// Lets an admin point the app icon (browser tab / PWA icon, expects an SVG) and the
+// square app logo (navbar, avatar fallback) at their own hosted images, without a
+// redeploy. Saved to this browser via branding.js; every tab reads the same values.
+function BrandingPanel() {
+  const [values, setValues] = useState(getBranding);
+  const [saved, setSaved] = useState(false);
+  const defaults = getDefaultBranding();
+
+  function handleChange(field, value) {
+    setValues((v) => ({ ...v, [field]: value }));
+    setSaved(false);
+  }
+
+  function handleSave(event) {
+    event.preventDefault();
+    setValues(setBranding(values));
+    setSaved(true);
+  }
+
+  function handleReset() {
+    setValues(resetBranding());
+    setSaved(false);
+  }
+
+  return (
+    <div className="panel admin-security-panel">
+      <div>
+        <div className="section-eyebrow">Brand assets</div>
+        <h3 className="admin-panel-title">App icon &amp; logo</h3>
+        <p className="card-sub">
+          Point these at your own hosted images to rebrand the app instantly, no redeploy needed.
+          The app icon should be an SVG (used as the browser tab icon); the app logo should be square.
+        </p>
+      </div>
+
+      <form className="branding-form" onSubmit={handleSave}>
+        <div className="branding-field">
+          <label htmlFor="app-icon-url">App icon URL (SVG)</label>
+          <div className="branding-field-row">
+            <img
+              className="branding-preview branding-preview-icon"
+              src={values.appIconUrl || defaults.appIconUrl}
+              alt="App icon preview"
+              onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
+              onLoad={(e) => { e.currentTarget.style.visibility = 'visible'; }}
+            />
+            <input
+              id="app-icon-url"
+              type="url"
+              placeholder="https://example.com/app-icon.svg"
+              value={values.appIconUrl}
+              onChange={(e) => handleChange('appIconUrl', e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="branding-field">
+          <label htmlFor="app-logo-url">App logo URL (square)</label>
+          <div className="branding-field-row">
+            <img
+              className="branding-preview branding-preview-logo"
+              src={values.appLogoUrl || defaults.appLogoUrl}
+              alt="App logo preview"
+              onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
+              onLoad={(e) => { e.currentTarget.style.visibility = 'visible'; }}
+            />
+            <input
+              id="app-logo-url"
+              type="url"
+              placeholder="https://example.com/app-logo-square.png"
+              value={values.appLogoUrl}
+              onChange={(e) => handleChange('appLogoUrl', e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="branding-actions">
+          <button type="submit" className="btn-primary">Save brand assets</button>
+          <button type="button" className="btn-ghost" onClick={handleReset}>Reset to default</button>
+          {saved && <span className="branding-saved">Saved — applied across the app now.</span>}
+        </div>
+      </form>
+    </div>
+  );
+}
 
 function initials(name) {
   if (!name) return '?';
@@ -257,7 +344,7 @@ export default function AdminDashboard() {
           <div>
             <div className="section-eyebrow">Admin</div>
             <h2 className="section-h2" style={{ marginBottom: 0 }}>
-              {tab === 'listings' ? 'All listings' : tab === 'applications' ? 'Applicant qualification' : 'Waitlist and pre bookings'}
+              {tab === 'listings' ? 'All listings' : tab === 'applications' ? 'Applicant qualification' : tab === 'waitlist' ? 'Waitlist and pre bookings' : 'Branding'}
             </h2>
           </div>
           <Link className="btn-outline-green" to="/admin/land-uses">Manage land uses</Link>
@@ -273,6 +360,9 @@ export default function AdminDashboard() {
           <button type="button" className={`admin-tab ${tab === 'waitlist' ? 'active' : ''}`} onClick={() => setTab('waitlist')}>
             Waitlist
           </button>
+          <button type="button" className={`admin-tab ${tab === 'branding' ? 'active' : ''}`} onClick={() => setTab('branding')}>
+            Branding
+          </button>
         </div>
 
         {error && <div className="error-box">{error}</div>}
@@ -281,6 +371,8 @@ export default function AdminDashboard() {
           <ApplicationsPanel token={token} />
         ) : tab === 'waitlist' ? (
           <WaitlistPanel token={token} />
+        ) : tab === 'branding' ? (
+          <BrandingPanel />
         ) : (
           <>
             {authSettings && (
