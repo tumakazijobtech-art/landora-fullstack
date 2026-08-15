@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -9,12 +9,21 @@ import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Marketplace from './pages/Marketplace.jsx';
 import ParcelDetail from './pages/ParcelDetail.jsx';
-import CreateParcel from './pages/CreateParcel.jsx';
-import LandownerDashboard from './pages/LandownerDashboard.jsx';
-import FarmerDashboard from './pages/FarmerDashboard.jsx';
-import AdminDashboard from './pages/AdminDashboard.jsx';
-import AdminParcelEditor from './pages/AdminParcelEditor.jsx';
-import AdminLandUses from './pages/AdminLandUses.jsx';
+
+// Code-split the pages most visitors never open in a given session (listing creation,
+// the two dashboards, and the whole admin back office). This keeps the first-load
+// bundle focused on browsing — the actual "frequently viewed" path — and defers the
+// rest until someone navigates there.
+const CreateParcel = lazy(() => import('./pages/CreateParcel.jsx'));
+const LandownerDashboard = lazy(() => import('./pages/LandownerDashboard.jsx'));
+const FarmerDashboard = lazy(() => import('./pages/FarmerDashboard.jsx'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
+const AdminParcelEditor = lazy(() => import('./pages/AdminParcelEditor.jsx'));
+const AdminLandUses = lazy(() => import('./pages/AdminLandUses.jsx'));
+
+function PageFallback() {
+  return <div className="section"><div className="section-inner">Loading…</div></div>;
+}
 
 function Dashboard() {
   const { user } = useAuth();
@@ -28,54 +37,56 @@ export default function App() {
   return (
     <>
       <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/marketplace" element={<Marketplace />} />
-        <Route path="/parcels/:id" element={<ParcelDetail />} />
-        <Route
-          path="/parcels/new"
-          element={
-            <ProtectedRoute role="landowner">
-              <CreateParcel />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute role="admin">
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/land-uses"
-          element={
-            <ProtectedRoute role="admin">
-              <AdminLandUses />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/parcels/:id"
-          element={
-            <ProtectedRoute role="admin">
-              <AdminParcelEditor />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<Home />} />
-      </Routes>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/parcels/:id" element={<ParcelDetail />} />
+          <Route
+            path="/parcels/new"
+            element={
+              <ProtectedRoute role="landowner">
+                <CreateParcel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/land-uses"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminLandUses />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/parcels/:id"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminParcelEditor />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Home />} />
+        </Routes>
+      </Suspense>
     </>
   );
 }

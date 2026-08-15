@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import InteractiveHeroBackground from '../components/InteractiveHeroBackground.jsx';
 
 export default function Home() {
   const { user } = useAuth();
@@ -8,6 +9,7 @@ export default function Home() {
   return (
     <div>
       <div className="hero">
+        <InteractiveHeroBackground />
         <div className="hero-inner">
           <div className="hero-eyebrow">Land leasing, done properly</div>
           <h1 className="hero-h1">Lease farmland with confidence.</h1>

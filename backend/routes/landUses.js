@@ -2,13 +2,15 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const LandUse = require('../models/LandUse');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const cache = require('../middleware/cache');
 
 const router = express.Router();
+const LIST_TTL_MS = 5 * 60 * 1000; // land uses change rarely — cache generously
 
 // Public: land use options currently offered, for the create-listing crop field,
 // marketplace filter, and Landora Match. Adapts automatically as admins add/retire
 // options — nothing here is hardcoded in the frontend.
-router.get('/', async (req, res) => {
+router.get('/', cache.cacheGet(LIST_TTL_MS), async (req, res) => {
   const landUses = await LandUse.find({ active: true }).sort({ sortOrder: 1, name: 1 });
   res.json({ landUses });
 });
@@ -35,6 +37,7 @@ router.post(
         sortOrder: req.body.sortOrder || 0,
       });
       res.status(201).json({ landUse });
+      cache.invalidate('/api/land-uses');
     } catch (err) {
       if (err.code === 11000) {
         return res.status(409).json({ error: 'That land use already exists' });
@@ -53,6 +56,7 @@ router.patch('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   });
   await landUse.save();
   res.json({ landUse });
+  cache.invalidate('/api/land-uses');
 });
 
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
@@ -60,6 +64,7 @@ router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   if (!landUse) return res.status(404).json({ error: 'Land use not found' });
   await landUse.deleteOne();
   res.json({ ok: true });
+  cache.invalidate('/api/land-uses');
 });
 
 module.exports = router;

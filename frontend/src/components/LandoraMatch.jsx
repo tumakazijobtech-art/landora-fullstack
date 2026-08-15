@@ -29,6 +29,7 @@ export default function LandoraMatch({ open, onClose, onMatch }) {
   function handleSubmit(e) {
     e.preventDefault();
     onMatch({
+      match: 'true',
       near: form.near,
       withinKm: form.withinKm,
       minSize: form.minSize,
@@ -46,8 +47,9 @@ export default function LandoraMatch({ open, onClose, onMatch }) {
         <div className="match-icon">⌕</div>
         <div className="card-title" style={{ marginBottom: 4 }}>Landora Match</div>
         <div className="card-sub" style={{ maxWidth: 460 }}>
-          Set what you need once. Landora ranks every verified parcel against it, so you are not
-          scrolling through listings that were never going to fit.
+          Set what you need once. Landora's recommender engine scores and ranks every verified
+          parcel against it — so instead of a plain filter, you get a personalised match
+          percentage and the reasons behind it.
         </div>
 
         <form onSubmit={handleSubmit}>

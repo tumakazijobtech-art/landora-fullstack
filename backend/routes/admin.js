@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Parcel = require('../models/Parcel');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const cache = require('../middleware/cache');
 
 const router = express.Router();
 
@@ -40,6 +41,7 @@ router.patch('/parcels/:id', async (req, res) => {
 
   await parcel.save();
   res.json({ parcel });
+  cache.invalidate('/api/parcels');
 });
 
 // Admin: the internal enrichment pass — verified key facts, the GIS productivity
@@ -109,6 +111,7 @@ router.patch(
 
     await parcel.save();
     res.json({ parcel });
+    cache.invalidate('/api/parcels');
   }
 );
 
@@ -117,6 +120,7 @@ router.delete('/parcels/:id', async (req, res) => {
   if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
   await parcel.deleteOne();
   res.json({ ok: true });
+  cache.invalidate('/api/parcels');
 });
 
 module.exports = router;

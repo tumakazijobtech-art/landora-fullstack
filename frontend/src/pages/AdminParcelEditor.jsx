@@ -20,6 +20,7 @@ function textToPoints(text) {
 }
 
 const EMPTY_RAINFALL = ['2022', '2023', '2024', '2025', '2026'].map((season) => ({ season, insurable: true }));
+const TAG_OPTIONS = ['Financing', 'Insured', 'River access', 'Road access', 'Borehole', 'Export zone'];
 
 export default function AdminParcelEditor() {
   const { id } = useParams();
@@ -42,6 +43,7 @@ export default function AdminParcelEditor() {
   const [centroidLat, setCentroidLat] = useState('');
   const [centroidLng, setCentroidLng] = useState('');
   const [video, setVideo] = useState({});
+  const [photosText, setPhotosText] = useState('');
 
   useEffect(() => {
     api.adminGetParcel(id, token)
@@ -62,6 +64,7 @@ export default function AdminParcelEditor() {
         setCentroidLat(p.mapData?.centroidLat ?? '');
         setCentroidLng(p.mapData?.centroidLng ?? '');
         setVideo(p.videoWalkthrough || {});
+        setPhotosText((p.photos || []).join(', '));
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -70,6 +73,12 @@ export default function AdminParcelEditor() {
 
   function updateBase(field, value) {
     setBase((b) => ({ ...b, [field]: value }));
+  }
+  function toggleTag(tag) {
+    setBase((b) => ({
+      ...b,
+      tags: (b.tags || []).includes(tag) ? b.tags.filter((t) => t !== tag) : [...(b.tags || []), tag],
+    }));
   }
   function updateKeyFacts(field, value) {
     setKeyFacts((k) => ({ ...k, [field]: value }));
@@ -112,6 +121,11 @@ export default function AdminParcelEditor() {
         description: base.description,
         status: base.status,
         score,
+        tags: base.tags || [],
+        photos: photosText.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 6),
+        financingAvailable: !!base.financingAvailable,
+        insured: !!base.insured,
+        waterAccess: !!base.waterAccess,
       }, token);
 
       await api.adminEnrichParcel(id, {
@@ -250,6 +264,42 @@ export default function AdminParcelEditor() {
                 </div>
               </div>
               <div className="field"><label>Description</label><textarea rows={3} value={base.description || ''} onChange={(e) => updateBase('description', e.target.value)} /></div>
+              <div className="field-row">
+                <div className="field"><label>Season</label><input value={base.season || ''} onChange={(e) => updateBase('season', e.target.value)} placeholder="e.g. Long rains 2026" /></div>
+              </div>
+              <div className="field">
+                <label>Photo URLs, comma separated (up to 6 — these auto-slide on the listing)</label>
+                <input value={photosText} onChange={(e) => setPhotosText(e.target.value)} placeholder="https://..., https://..." />
+                <div style={{ fontSize: 12, color: 'var(--s500)', marginTop: 4 }}>
+                  {photosText.split(',').map((s) => s.trim()).filter(Boolean).length} / 6 photos
+                </div>
+              </div>
+              <div className="field">
+                <label>Tags</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {TAG_OPTIONS.map((tag) => (
+                    <span
+                      key={tag}
+                      className={`filter-badge ${(base.tags || []).includes(tag) ? 'active' : ''}`}
+                      onClick={() => toggleTag(tag)}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="checkbox-row">
+                <input type="checkbox" id="adminFinancing" checked={!!base.financingAvailable} onChange={(e) => updateBase('financingAvailable', e.target.checked)} />
+                <label htmlFor="adminFinancing" style={{ margin: 0 }}>Financing available for this parcel</label>
+              </div>
+              <div className="checkbox-row">
+                <input type="checkbox" id="adminInsured" checked={!!base.insured} onChange={(e) => updateBase('insured', e.target.checked)} />
+                <label htmlFor="adminInsured" style={{ margin: 0 }}>Insurance available for this parcel</label>
+              </div>
+              <div className="checkbox-row">
+                <input type="checkbox" id="adminWaterAccess" checked={!!base.waterAccess} onChange={(e) => updateBase('waterAccess', e.target.checked)} />
+                <label htmlFor="adminWaterAccess" style={{ margin: 0 }}>This parcel has water access</label>
+              </div>
             </div>
           </div>
 

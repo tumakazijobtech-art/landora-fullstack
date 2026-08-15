@@ -2,7 +2,15 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import ScoreBadge from './ScoreBadge.jsx';
 
+function matchTier(score) {
+  if (score >= 80) return 'match-high';
+  if (score >= 55) return 'match-mid';
+  return 'match-low';
+}
+
 export default function ParcelCard({ parcel }) {
+  const hasMatch = typeof parcel.matchScore === 'number';
+
   return (
     <Link className="parcel-card" to={`/parcels/${parcel._id}`}>
       <div className="parcel-img">
@@ -13,6 +21,11 @@ export default function ParcelCard({ parcel }) {
         {parcel.score && (
           <span className="parcel-score-top">
             <ScoreBadge score={parcel.score} size="xs" />
+          </span>
+        )}
+        {hasMatch && (
+          <span className={`match-badge ${matchTier(parcel.matchScore)}`}>
+            {parcel.matchScore}% match
           </span>
         )}
       </div>
@@ -28,6 +41,15 @@ export default function ParcelCard({ parcel }) {
             <span className="parcel-tag" key={t}>{t}</span>
           ))}
         </div>
+
+        {hasMatch && parcel.matchReasons && parcel.matchReasons.length > 0 && (
+          <div className="match-reasons">
+            {parcel.matchReasons.map((r) => (
+              <span className="match-reason" key={r}>✓ {r}</span>
+            ))}
+          </div>
+        )}
+
         <div className="parcel-footer">
           <div className="parcel-price">
             KES {Number(parcel.pricePerAcrePerSeason).toLocaleString()} <span>per ac per season</span>

@@ -15,7 +15,7 @@ a{color:inherit}
 
 nav{position:sticky;top:0;z-index:100;background:var(--g800);display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:56px}
 .nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none}
-.nav-logo{width:30px;height:30px;border-radius:8px;background:var(--o500);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--w)}
+.nav-logo{width:32px;height:32px;border-radius:8px;display:block;object-fit:cover}
 .nav-name{color:var(--w);font-weight:600;font-size:17px;letter-spacing:-0.3px}
 .nav-links{display:flex;gap:4px;align-items:center}
 .nav-link{color:var(--g200);font-size:14px;padding:6px 12px;border-radius:var(--rsm);cursor:pointer;border:none;background:none;font-family:inherit;transition:background 0.15s,color 0.15s;text-decoration:none}
@@ -23,8 +23,12 @@ nav{position:sticky;top:0;z-index:100;background:var(--g800);display:flex;align-
 .nav-cta{background:var(--o500);color:var(--w);border:none;padding:8px 18px;border-radius:var(--rsm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background 0.15s;text-decoration:none}
 .nav-cta:hover{background:var(--o400)}
 
-.hero{background:var(--g800);padding:72px 2rem}
-.hero-inner{max-width:1100px;margin:0 auto}
+.hero{background:var(--g800);padding:72px 2rem;position:relative;overflow:hidden}
+.hero-inner{max-width:1100px;margin:0 auto;position:relative;z-index:1}
+.hero-bg{position:absolute;inset:0;z-index:0;cursor:default}
+.hero-bg-svg{width:100%;height:100%;display:block}
+.hero-bg-layer{transition:transform 0.35s cubic-bezier(0.22,1,0.36,1)}
+@media (prefers-reduced-motion:reduce){.hero-bg-layer{transition:none}}
 .hero-eyebrow{display:inline-block;background:rgba(200,136,26,0.2);color:var(--o400);font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;padding:4px 12px;border-radius:4px;margin-bottom:20px}
 .hero-h1{font-size:44px;font-weight:700;color:var(--o400);line-height:1.1;letter-spacing:-1.5px;margin-bottom:20px}
 .hero-sub{color:var(--g200);font-size:16px;line-height:1.65;margin-bottom:32px;max-width:520px}
@@ -214,3 +218,14 @@ table.data-table td{padding:12px;border-bottom:1px solid var(--s100)}
   .metric-row{grid-template-columns:110px 1fr 36px}
   .score-hero-letter{font-size:36px}
 }
+
+/* ---------- Landora Match recommender badges ---------- */
+.match-badge{position:absolute;bottom:10px;left:10px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;color:var(--w);box-shadow:0 1px 4px rgba(13,43,20,0.25)}
+.match-badge.match-high{background:var(--g700)}
+.match-badge.match-mid{background:var(--o500)}
+.match-badge.match-low{background:var(--s400)}
+.match-reasons{display:flex;flex-direction:column;gap:3px;margin:8px 0 4px}
+.match-reason{font-size:11.5px;color:var(--g700)}
+.match-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.match-header-title{font-weight:700;font-size:15px;color:var(--s900)}
+.match-header-sub{font-size:13px;color:var(--s500)}
