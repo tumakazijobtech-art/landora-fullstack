@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import InteractiveHeroBackground from '../components/InteractiveHeroBackground.jsx';
+import LightHeroBackground from '../components/LightHeroBackground.jsx';
 import LandoraTour from '../components/LandoraTour.jsx';
 
 export default function Home() {
@@ -9,8 +9,8 @@ export default function Home() {
 
   return (
     <div>
-      <div className="hero hero-centered">
-        <InteractiveHeroBackground />
+      <div className="hero hero-centered hero-light">
+        <LightHeroBackground />
         <div className="hero-inner">
           <div className="hero-eyebrow">Land leasing, seen from every angle</div>
           <h1 className="hero-h1">A better way to lease productive land.</h1>

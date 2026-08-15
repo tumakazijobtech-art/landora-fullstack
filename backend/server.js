@@ -18,6 +18,7 @@ const parcelRoutes = require('./routes/parcels');
 const applicationRoutes = require('./routes/applications');
 const landUseRoutes = require('./routes/landUses');
 const adminRoutes = require('./routes/admin');
+const wishlistRoutes = require('./routes/wishlist');
 
 const app = express();
 
@@ -64,6 +65,7 @@ app.use('/api/parcels', parcelRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/land-uses', landUseRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 

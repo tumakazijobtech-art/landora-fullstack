@@ -11,6 +11,9 @@ import VerifyAccount from './pages/VerifyAccount.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import Marketplace from './pages/Marketplace.jsx';
 import ParcelDetail from './pages/ParcelDetail.jsx';
+import Terms from './pages/Terms.jsx';
+import Privacy from './pages/Privacy.jsx';
+import BottomNav from './components/BottomNav.jsx';
 
 // Code-split the pages most visitors never open in a given session (listing creation,
 // the two dashboards, and the whole admin back office). This keeps the first-load
@@ -22,6 +25,8 @@ const FarmerDashboard = lazy(() => import('./pages/FarmerDashboard.jsx'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 const AdminParcelEditor = lazy(() => import('./pages/AdminParcelEditor.jsx'));
 const AdminLandUses = lazy(() => import('./pages/AdminLandUses.jsx'));
+const Profile = lazy(() => import('./pages/Profile.jsx'));
+const Saved = lazy(() => import('./pages/Saved.jsx'));
 
 function PageFallback() {
   return <div className="section"><div className="section-inner">Loading…</div></div>;
@@ -36,61 +41,83 @@ function Dashboard() {
 }
 
 export default function App() {
+  const { user } = useAuth();
   return (
     <>
       <Navbar />
-      <Suspense fallback={<PageFallback />}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/verify" element={<VerifyAccount />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/parcels/:id" element={<ParcelDetail />} />
-          <Route
-            path="/parcels/new"
-            element={
-              <ProtectedRoute role="landowner">
-                <CreateParcel />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute role="admin">
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/land-uses"
-            element={
-              <ProtectedRoute role="admin">
-                <AdminLandUses />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/parcels/:id"
-            element={
-              <ProtectedRoute role="admin">
-                <AdminParcelEditor />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Home />} />
-        </Routes>
-      </Suspense>
+      <div className={user ? 'has-bottom-nav-spacer' : undefined}>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/verify" element={<VerifyAccount />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/parcels/:id" element={<ParcelDetail />} />
+            <Route
+              path="/parcels/new"
+              element={
+                <ProtectedRoute role="landowner">
+                  <CreateParcel />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/saved"
+              element={
+                <ProtectedRoute>
+                  <Saved />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/land-uses"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminLandUses />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/parcels/:id"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminParcelEditor />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<Home />} />
+          </Routes>
+        </Suspense>
+      </div>
+      {user && <BottomNav />}
     </>
   );
 }

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import MediaTabs from '../components/MediaTabs.jsx';
 import ScoreBadge from '../components/ScoreBadge.jsx';
 import RainfallHistory from '../components/RainfallHistory.jsx';
+import WishlistButton from '../components/WishlistButton.jsx';
 
 const METRIC_LABELS = {
   soilQuality: 'Soil quality',
@@ -54,6 +55,7 @@ export default function ParcelDetail() {
   const [applyError, setApplyError] = useState('');
   const [applySuccess, setApplySuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [shareStatus, setShareStatus] = useState('');
 
   const applyRef = useRef(null);
 
@@ -65,6 +67,30 @@ export default function ParcelDetail() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function handleShare() {
+    const url = window.location.href;
+    const shareData = {
+      title: parcel ? `${parcel.title} · Landora` : 'Landora listing',
+      text: parcel ? `${parcel.title} — ${parcel.sizeAcres} acres in ${parcel.county} County, on Landora.` : 'Check out this listing on Landora.',
+      url,
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+    } catch {
+      // User cancelled the native share sheet, or it's unsupported — fall through to copy.
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareStatus('Link copied to clipboard');
+    } catch {
+      setShareStatus(url);
+    }
+    setTimeout(() => setShareStatus(''), 3000);
+  }
 
   function goToApply() {
     if (!user) {
@@ -116,12 +142,11 @@ export default function ParcelDetail() {
             <span>{parcel.county} County</span>
           </div>
           <div className="parcel-topbar-actions">
-            <button type="button" className="icon-btn" title="Save this listing" aria-label="Save this listing">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 21s-7.5-4.6-10-9.2C.5 8.2 2.3 4.5 6 4c2.2-.3 4 .9 6 3 2-2.1 3.8-3.3 6-3 3.7.5 5.5 4.2 4 7.8C19.5 16.4 12 21 12 21z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg>
-            </button>
-            <button type="button" className="icon-btn" title="Share this listing" aria-label="Share this listing">
+            <WishlistButton parcelId={parcel._id} variant="icon" />
+            <button type="button" className="icon-btn" title="Share this listing" aria-label="Share this listing" onClick={handleShare}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="18" cy="5" r="3" stroke="currentColor" strokeWidth="1.6"/><circle cx="6" cy="12" r="3" stroke="currentColor" strokeWidth="1.6"/><circle cx="18" cy="19" r="3" stroke="currentColor" strokeWidth="1.6"/><path d="M8.6 10.5L15.4 6.5M8.6 13.5L15.4 17.5" stroke="currentColor" strokeWidth="1.6"/></svg>
             </button>
+            {shareStatus && <span className="share-toast">{shareStatus}</span>}
           </div>
         </div>
 
@@ -378,7 +403,11 @@ export default function ParcelDetail() {
 
               {parcel.owner && (
                 <div className="sidebar-owner">
-                  <div className="sidebar-owner-avatar">{initials(parcel.owner.name)}</div>
+                  {parcel.owner.profilePicture ? (
+                    <img className="sidebar-owner-avatar sidebar-owner-avatar-img" src={parcel.owner.profilePicture} alt={parcel.owner.name} />
+                  ) : (
+                    <div className="sidebar-owner-avatar">{initials(parcel.owner.name)}</div>
+                  )}
                   <div>
                     <div className="sidebar-owner-name">{parcel.owner.name}</div>
                     <div className="sidebar-owner-sub">Verified landowner{parcel.owner.county ? ` · ${parcel.owner.county}` : ''}</div>

@@ -36,8 +36,15 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
+  // Merges a partial user update (e.g. after saving a profile picture, or after a
+  // wishlist toggle changes the saved-parcel id list) into the current session
+  // without a full re-fetch.
+  function updateUser(patch) {
+    setUser((u) => (u ? { ...u, ...patch } : u));
+  }
+
   return (
-    <AuthContext.Provider value={{ token, user, loading, login, logout }}>
+    <AuthContext.Provider value={{ token, user, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

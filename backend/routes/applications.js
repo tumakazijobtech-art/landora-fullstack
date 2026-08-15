@@ -70,7 +70,10 @@ router.patch('/:id/withdraw', requireAuth, requireRole('farmer'), async (req, re
   res.json({ application });
 });
 
-// Landowner: view applications received, optionally filtered by parcel.
+// Landowner: view applications received, optionally filtered by parcel. Landowners
+// can see who has applied and the status/notes of each application, but the
+// accept/decline decision itself is made by the Landora team — see PATCH
+// /admin/applications/:id/decision in routes/admin.js.
 router.get('/received', requireAuth, requireRole('landowner'), async (req, res) => {
   const filter = { landowner: req.user._id };
   if (req.query.parcelId) filter.parcel = req.query.parcelId;
@@ -78,39 +81,8 @@ router.get('/received', requireAuth, requireRole('landowner'), async (req, res) 
   const applications = await Application.find(filter)
     .sort({ createdAt: -1 })
     .populate('parcel', 'title county location')
-    .populate('farmer', 'name phone email county');
+    .populate('farmer', 'name phone email county profilePicture');
   res.json({ applications });
 });
-
-// Landowner: accept or decline an application received.
-router.patch(
-  '/:id/decision',
-  requireAuth,
-  requireRole('landowner'),
-  [body('status').isIn(['accepted', 'declined']), body('landownerNote').optional({ checkFalsy: true }).trim().isLength({ max: 2000 })],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: 'Invalid decision' });
-    }
-
-    const application = await Application.findById(req.params.id);
-    if (!application) return res.status(404).json({ error: 'Application not found' });
-    if (application.landowner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'Not your listing' });
-    }
-
-    application.status = req.body.status;
-    if (req.body.landownerNote !== undefined) application.landownerNote = req.body.landownerNote;
-    await application.save();
-
-    // Accepting a lease application takes the parcel off the market.
-    if (req.body.status === 'accepted') {
-      await Parcel.findByIdAndUpdate(application.parcel, { status: 'leased' });
-    }
-
-    res.json({ application });
-  }
-);
 
 module.exports = router;

@@ -3,8 +3,121 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
+function initials(name) {
+  if (!name) return '?';
+  return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('');
+}
+
+function ApplicantAvatar({ person, size = 32 }) {
+  if (person?.profilePicture) {
+    return <img src={person.profilePicture} alt="" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flex: 'none' }} />;
+  }
+  return (
+    <div className="sidebar-owner-avatar" style={{ width: size, height: size, fontSize: size * 0.4, flex: 'none' }}>
+      {initials(person?.name)}
+    </div>
+  );
+}
+
+// Admin: the applicant qualification queue. Landowners can only view who applied to
+// their listings (see LandownerDashboard) — accepting or declining an applicant is
+// exclusively an admin action, done here after the Landora team has qualified them.
+function ApplicationsPanel({ token }) {
+  const [applications, setApplications] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('pending');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+
+  function load(status) {
+    setLoading(true);
+    return api.adminApplications(token, status ? { status } : {})
+      .then((data) => setApplications(data.applications))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    load(statusFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  async function decide(id, status) {
+    setBusyId(id);
+    setError('');
+    try {
+      await api.adminDecideApplication(id, { status }, token);
+      await load(statusFilter);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="filter-bar">
+        {['pending', 'accepted', 'declined', 'withdrawn', ''].map((s) => (
+          <span
+            key={s || 'all'}
+            className={`filter-badge ${statusFilter === s ? 'active' : ''}`}
+            onClick={() => setStatusFilter(s)}
+          >
+            {s ? s[0].toUpperCase() + s.slice(1) : 'All'}
+          </span>
+        ))}
+      </div>
+
+      {error && <div className="error-box">{error}</div>}
+      {loading ? (
+        <div className="empty-state">Loading…</div>
+      ) : applications.length === 0 ? (
+        <div className="empty-state">No applications match this filter.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {applications.map((a) => (
+            <div className="panel" key={a._id}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <ApplicantAvatar person={a.farmer} />
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{a.farmer?.name} → {a.parcel?.title}</div>
+                    <div style={{ fontSize: 12, color: 'var(--s500)' }}>
+                      {a.farmer?.phone && `${a.farmer.phone} · `}{a.farmer?.email}
+                      {a.parcel?.county ? ` · ${a.parcel.county} County` : ''}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--s400)', marginTop: 2 }}>
+                      Landowner: {a.landowner?.name || '—'}
+                    </div>
+                  </div>
+                </div>
+                <span className={`status-pill status-${a.status}`}>{a.status}</span>
+              </div>
+              {a.intendedCrop && <div style={{ fontSize: 13, marginTop: 8 }}>Intended crop: {a.intendedCrop}</div>}
+              {a.seasonsRequested && <div style={{ fontSize: 13 }}>Seasons requested: {a.seasonsRequested}</div>}
+              {a.message && <div style={{ fontSize: 13, marginTop: 8, color: 'var(--s700)' }}>"{a.message}"</div>}
+              {a.status === 'pending' && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button className="btn-green" disabled={busyId === a._id} onClick={() => decide(a._id, 'accepted')}>
+                    {busyId === a._id ? 'Working…' : 'Accept'}
+                  </button>
+                  <button className="btn-outline-green" disabled={busyId === a._id} onClick={() => decide(a._id, 'declined')}>
+                    Decline
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { token } = useAuth();
+  const [tab, setTab] = useState('listings');
   const [parcels, setParcels] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -49,82 +162,105 @@ export default function AdminDashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div className="section-eyebrow">Admin</div>
-            <h2 className="section-h2" style={{ marginBottom: 0 }}>All listings</h2>
+            <h2 className="section-h2" style={{ marginBottom: 0 }}>
+              {tab === 'listings' ? 'All listings' : 'Applicant qualification'}
+            </h2>
           </div>
           <Link className="btn-outline-green" to="/admin/land-uses">Manage land uses</Link>
         </div>
-        {error && <div className="error-box">{error}</div>}
 
-        {authSettings && (
-          <div className="panel admin-security-panel">
-            <div>
-              <div className="section-eyebrow">Account protection</div>
-              <h3 className="admin-panel-title">Verification policy</h3>
-              <p className="card-sub">These controls apply to new users. Both email and phone codes are required whenever a policy is enabled.</p>
-            </div>
-            <div className="security-toggles">
-              <label className="toggle-row">
-                <span>
-                  <strong>Verify new users on sign up</strong>
-                  <small>Require both channels before the first session begins.</small>
-                </span>
-                <input type="checkbox" checked={authSettings.requireVerificationOnSignup} disabled={savingSettings} onChange={(event) => updateAuthSetting('requireVerificationOnSignup', event.target.checked)} />
-              </label>
-              <label className="toggle-row">
-                <span>
-                  <strong>Verify on every sign in</strong>
-                  <small>Send a fresh email code and phone code each time a new user logs in.</small>
-                </span>
-                <input type="checkbox" checked={authSettings.requireVerificationOnSignIn} disabled={savingSettings} onChange={(event) => updateAuthSetting('requireVerificationOnSignIn', event.target.checked)} />
-              </label>
-            </div>
-          </div>
-        )}
-
-        <div className="filter-bar">
-          <span className={`filter-badge ${filter === '' ? 'active' : ''}`} onClick={() => setFilter('')}>All ({parcels.length})</span>
-          <span className={`filter-badge ${filter === 'pending' ? 'active' : ''}`} onClick={() => setFilter('pending')}>
-            Awaiting enrichment ({parcels.filter((p) => p.enrichmentStatus === 'pending').length})
-          </span>
-          <span className={`filter-badge ${filter === 'enriched' ? 'active' : ''}`} onClick={() => setFilter('enriched')}>
-            Enriched ({parcels.filter((p) => p.enrichmentStatus === 'enriched').length})
-          </span>
+        <div className="admin-tabbar">
+          <button type="button" className={`admin-tab ${tab === 'listings' ? 'active' : ''}`} onClick={() => setTab('listings')}>
+            Listings
+          </button>
+          <button type="button" className={`admin-tab ${tab === 'applications' ? 'active' : ''}`} onClick={() => setTab('applications')}>
+            Applications
+          </button>
         </div>
 
-        {visible.length === 0 ? (
-          <div className="empty-state">No listings match this filter.</div>
+        {error && <div className="error-box">{error}</div>}
+
+        {tab === 'applications' ? (
+          <ApplicationsPanel token={token} />
         ) : (
-          <div className="panel" style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Parcel</th><th>Owner</th><th>County</th><th>Score</th><th>Title check</th><th>Status</th><th>Enrichment</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((p) => (
-                  <tr key={p._id}>
-                    <td>{p.title}<div style={{ fontSize: 11, color: 'var(--s400)' }}>{p.reference}</div></td>
-                    <td>{p.owner?.name}</td>
-                    <td>{p.county}</td>
-                    <td>{p.score || '—'}</td>
-                    <td>
-                      <span className={`status-pill ${p.titleVerification?.status === 'verified' ? 'status-accepted' : p.titleVerification?.status === 'flagged' ? 'status-declined' : 'status-pending'}`}>
-                        {p.titleVerification?.status ? p.titleVerification.status.replace('_', ' ') : 'unverified'}
-                      </span>
-                    </td>
-                    <td><span className={`status-pill status-${p.status}`}>{p.status.replace('_', ' ')}</span></td>
-                    <td>
-                      <span className={`status-pill ${p.enrichmentStatus === 'enriched' ? 'status-accepted' : 'status-pending'}`}>
-                        {p.enrichmentStatus === 'enriched' ? 'Enriched' : 'Awaiting enrichment'}
-                      </span>
-                    </td>
-                    <td><Link className="btn-outline-green" to={`/admin/parcels/${p._id}`}>Edit</Link></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {authSettings && (
+              <div className="panel admin-security-panel">
+                <div>
+                  <div className="section-eyebrow">Account protection</div>
+                  <h3 className="admin-panel-title">Verification policy</h3>
+                  <p className="card-sub">These controls apply to new users. Both email and phone codes are required whenever a policy is enabled.</p>
+                </div>
+                <div className="security-toggles">
+                  <label className="toggle-row">
+                    <span>
+                      <strong>Verify new users on sign up</strong>
+                      <small>Require both channels before the first session begins.</small>
+                    </span>
+                    <input type="checkbox" checked={authSettings.requireVerificationOnSignup} disabled={savingSettings} onChange={(event) => updateAuthSetting('requireVerificationOnSignup', event.target.checked)} />
+                  </label>
+                  <label className="toggle-row">
+                    <span>
+                      <strong>Verify on every sign in</strong>
+                      <small>Send a fresh email code and phone code each time a new user logs in.</small>
+                    </span>
+                    <input type="checkbox" checked={authSettings.requireVerificationOnSignIn} disabled={savingSettings} onChange={(event) => updateAuthSetting('requireVerificationOnSignIn', event.target.checked)} />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div className="filter-bar">
+              <span className={`filter-badge ${filter === '' ? 'active' : ''}`} onClick={() => setFilter('')}>All ({parcels.length})</span>
+              <span className={`filter-badge ${filter === 'pending' ? 'active' : ''}`} onClick={() => setFilter('pending')}>
+                Awaiting enrichment ({parcels.filter((p) => p.enrichmentStatus === 'pending').length})
+              </span>
+              <span className={`filter-badge ${filter === 'enriched' ? 'active' : ''}`} onClick={() => setFilter('enriched')}>
+                Enriched ({parcels.filter((p) => p.enrichmentStatus === 'enriched').length})
+              </span>
+            </div>
+
+            {visible.length === 0 ? (
+              <div className="empty-state">No listings match this filter.</div>
+            ) : (
+              <div className="panel" style={{ overflowX: 'auto' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Parcel</th><th>Owner</th><th>County</th><th>Score</th><th>Title check</th><th>Status</th><th>Enrichment</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visible.map((p) => (
+                      <tr key={p._id}>
+                        <td>{p.title}<div style={{ fontSize: 11, color: 'var(--s400)' }}>{p.reference}</div></td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <ApplicantAvatar person={p.owner} size={24} />
+                            {p.owner?.name}
+                          </div>
+                        </td>
+                        <td>{p.county}</td>
+                        <td>{p.score || '—'}</td>
+                        <td>
+                          <span className={`status-pill ${p.titleVerification?.status === 'verified' ? 'status-accepted' : p.titleVerification?.status === 'flagged' ? 'status-declined' : 'status-pending'}`}>
+                            {p.titleVerification?.status ? p.titleVerification.status.replace('_', ' ') : 'unverified'}
+                          </span>
+                        </td>
+                        <td><span className={`status-pill status-${p.status}`}>{p.status.replace('_', ' ')}</span></td>
+                        <td>
+                          <span className={`status-pill ${p.enrichmentStatus === 'enriched' ? 'status-accepted' : 'status-pending'}`}>
+                            {p.enrichmentStatus === 'enriched' ? 'Enriched' : 'Awaiting enrichment'}
+                          </span>
+                        </td>
+                        <td><Link className="btn-outline-green" to={`/admin/parcels/${p._id}`}>Edit</Link></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

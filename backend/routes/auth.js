@@ -68,12 +68,16 @@ router.post(
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('role').isIn(['farmer', 'landowner']),
     phoneValidator(),
-    body('county').optional({ checkFalsy: true }).isLength({ max: 60 }),
+    body('county').trim().notEmpty().withMessage('County is required').isLength({ max: 60 }),
+    body('profilePicture').optional({ checkFalsy: true }).trim().isLength({ max: 2000 }),
+    body('agreedToTerms')
+      .custom((value) => value === true || value === 'true')
+      .withMessage('You must agree to the Terms & Conditions and Privacy Policy'),
   ],
   async (req, res) => {
     if (firstValidationError(req, res)) return;
 
-    const { name, email, password, role, phone, county } = req.body;
+    const { name, email, password, role, phone, county, profilePicture } = req.body;
     const existing = await User.findOne({ $or: [{ email }, { phone }] });
     if (existing) {
       return res.status(409).json({
@@ -84,7 +88,17 @@ router.post(
     }
 
     const verificationPolicy = await getAuthPolicy();
-    const user = new User({ name, email, role, phone, county, verificationPolicy });
+    const user = new User({
+      name,
+      email,
+      role,
+      phone,
+      county,
+      profilePicture: profilePicture || '',
+      agreedToTerms: true,
+      termsAgreedAt: new Date(),
+      verificationPolicy,
+    });
     await user.setPassword(password);
 
     if (verificationPolicy.requireOnSignup) {
@@ -224,5 +238,33 @@ router.post(
 router.get('/me', requireAuth, async (req, res) => {
   res.json({ user: req.user.toSafeJSON() });
 });
+
+// Any logged-in user (farmer, landowner, or admin) can update their own display
+// details, including their profile picture — a URL, same convention as parcel photos.
+// Leaving profilePicture blank clears it, so the UI falls back to the Landora logo.
+router.patch(
+  '/profile',
+  requireAuth,
+  [
+    body('name').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
+    body('county').optional({ checkFalsy: true }).trim().isLength({ max: 60 }),
+    body('profilePicture').optional({ checkFalsy: true }).trim().isLength({ max: 2000 }),
+    body('phone').optional({ checkFalsy: true }),
+  ],
+  async (req, res) => {
+    if (firstValidationError(req, res)) return;
+
+    const user = req.user;
+    if (req.body.name !== undefined) user.name = req.body.name;
+    if (req.body.county !== undefined) user.county = req.body.county;
+    if (req.body.profilePicture !== undefined) user.profilePicture = req.body.profilePicture;
+    if (req.body.phone) {
+      const phone = normalizePhone(req.body.phone);
+      if (/^\+\d{10,15}$/.test(phone)) user.phone = phone;
+    }
+    await user.save();
+    res.json({ user: user.toSafeJSON() });
+  }
+);
 
 module.exports = router;

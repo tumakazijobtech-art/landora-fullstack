@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { LOGO_URL } from '../constants.js';
 
 export default function LandownerDashboard() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [parcels, setParcels] = useState([]);
   const [applications, setApplications] = useState([]);
   const [activeParcel, setActiveParcel] = useState(null);
@@ -27,15 +28,6 @@ export default function LandownerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleDecision(id, status) {
-    try {
-      await api.decideApplication(id, { status }, token);
-      await Promise.all([loadParcels(), loadApplications(activeParcel)]);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
   async function handleFilterByParcel(id) {
     setActiveParcel(id);
     try {
@@ -55,7 +47,13 @@ export default function LandownerDashboard() {
             <div className="section-eyebrow">Landowner dashboard</div>
             <h2 className="section-h2" style={{ marginBottom: 0 }}>Your listings</h2>
           </div>
-          <Link className="btn-green" to="/parcels/new">+ New listing</Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Link className="dash-profile-chip" to="/profile" title="Edit your profile picture">
+              <img src={user.profilePicture || LOGO_URL} alt="" />
+              <span>Edit profile photo</span>
+            </Link>
+            <Link className="btn-green" to="/parcels/new">+ New listing</Link>
+          </div>
         </div>
         {error && <div className="error-box">{error}</div>}
 
@@ -95,6 +93,10 @@ export default function LandownerDashboard() {
             <button className="btn-outline-green" onClick={() => handleFilterByParcel(null)}>Show all</button>
           )}
         </div>
+        <div className="info-box" style={{ marginBottom: 20 }}>
+          The Landora team reviews and qualifies every applicant on your behalf. You can see who has applied
+          and their status here — accepting or declining is handled by our team once an applicant is verified.
+        </div>
 
         {applications.length === 0 ? (
           <div className="empty-state">No applications yet for this filter.</div>
@@ -103,10 +105,19 @@ export default function LandownerDashboard() {
             {applications.map((a) => (
               <div className="panel" key={a._id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{a.farmer?.name} — {a.parcel?.title}</div>
-                    <div style={{ fontSize: 12, color: 'var(--s500)' }}>
-                      {a.farmer?.phone && `${a.farmer.phone} · `}{a.farmer?.email}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {a.farmer?.profilePicture ? (
+                      <img src={a.farmer.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                    ) : (
+                      <div className="sidebar-owner-avatar" style={{ width: 32, height: 32, fontSize: 12 }}>
+                        {(a.farmer?.name || '?').trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('')}
+                      </div>
+                    )}
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{a.farmer?.name} — {a.parcel?.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--s500)' }}>
+                        {a.farmer?.phone && `${a.farmer.phone} · `}{a.farmer?.email}
+                      </div>
                     </div>
                   </div>
                   <span className={`status-pill status-${a.status}`}>{a.status}</span>
@@ -114,11 +125,8 @@ export default function LandownerDashboard() {
                 {a.intendedCrop && <div style={{ fontSize: 13, marginTop: 8 }}>Intended crop: {a.intendedCrop}</div>}
                 {a.seasonsRequested && <div style={{ fontSize: 13 }}>Seasons requested: {a.seasonsRequested}</div>}
                 {a.message && <div style={{ fontSize: 13, marginTop: 8, color: 'var(--s700)' }}>"{a.message}"</div>}
-                {a.status === 'pending' && (
-                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <button className="btn-green" onClick={() => handleDecision(a._id, 'accepted')}>Accept</button>
-                    <button className="btn-outline-green" onClick={() => handleDecision(a._id, 'declined')}>Decline</button>
-                  </div>
+                {a.landownerNote && (
+                  <div style={{ fontSize: 13, marginTop: 8, color: 'var(--s700)' }}>Landora team note: {a.landownerNote}</div>
                 )}
               </div>
             ))}

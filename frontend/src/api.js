@@ -60,6 +60,7 @@ export const api = {
   requestPasswordReset: (payload) => request('/auth/forgot-password/request', { method: 'POST', body: payload }),
   resetPassword: (payload) => request('/auth/forgot-password/reset', { method: 'POST', body: payload }),
   me: (token) => request('/auth/me', { token }),
+  updateProfile: (payload, token) => request('/auth/profile', { method: 'PATCH', body: payload, token }),
 
   listParcels: (params = {}) => {
     const qs = new URLSearchParams(
@@ -90,8 +91,11 @@ export const api = {
   withdrawApplication: (id, token) => request(`/applications/${id}/withdraw`, { method: 'PATCH', token }),
   receivedApplications: (token, parcelId) =>
     request(`/applications/received${parcelId ? `?parcelId=${parcelId}` : ''}`, { token }),
-  decideApplication: (id, payload, token) =>
-    request(`/applications/${id}/decision`, { method: 'PATCH', body: payload, token }),
+
+  // Wishlist / saved listings — available to any logged-in role.
+  getWishlist: (token) => request('/wishlist', { token }),
+  addToWishlist: (parcelId, token) => request(`/wishlist/${parcelId}`, { method: 'POST', token }),
+  removeFromWishlist: (parcelId, token) => request(`/wishlist/${parcelId}`, { method: 'DELETE', token }),
 
   // Land use taxonomy — adaptable via the admin backend, powers the crop/land-use
   // dropdowns on listing creation, marketplace filters, and Landora Match.
@@ -135,4 +139,13 @@ export const api = {
       cacheInvalidate('GET:/parcels');
       return data;
     }),
+
+  // Admin: the applicant qualification queue. The admin is the one who accepts or
+  // declines lease applicants — landowners can only view them (see receivedApplications).
+  adminApplications: (token, params = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return request(`/admin/applications${qs ? `?${qs}` : ''}`, { token });
+  },
+  adminDecideApplication: (id, payload, token) =>
+    request(`/admin/applications/${id}/decision`, { method: 'PATCH', body: payload, token }),
 };

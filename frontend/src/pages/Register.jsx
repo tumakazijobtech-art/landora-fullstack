@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { COUNTIES, LOGO_URL } from '../constants.js';
 
 export default function Register() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    name: '', email: '', password: '', role: 'farmer', phone: '', county: '',
+    name: '', email: '', password: '', role: 'farmer', phone: '', county: '', profilePicture: '', agreedToTerms: false,
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -19,6 +20,10 @@ export default function Register() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    if (!form.agreedToTerms) {
+      setError('You must agree to the Terms & Conditions and Privacy Policy to create an account');
+      return;
+    }
     setSubmitting(true);
     try {
       const data = await api.register(form);
@@ -67,9 +72,41 @@ export default function Register() {
               <input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="07XX XXX XXX" />
             </div>
             <div className="field">
-              <label>County (optional)</label>
-              <input value={form.county} onChange={(e) => update('county', e.target.value)} />
+              <label>County</label>
+              <select required value={form.county} onChange={(e) => update('county', e.target.value)}>
+                <option value="">Select your county</option>
+                {COUNTIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
+            <div className="field">
+              <label>Profile picture URL (optional)</label>
+              <input
+                value={form.profilePicture}
+                onChange={(e) => update('profilePicture', e.target.value)}
+                placeholder="https://... — leave blank to use the Landora logo"
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                {form.profilePicture ? (
+                  <img src={form.profilePicture} alt="Profile preview" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--s100)' }} />
+                ) : (
+                  <img src={LOGO_URL} alt="Default Landora avatar" style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--s100)' }} />
+                )}
+                <span style={{ fontSize: 11.5, color: 'var(--s500)' }}>Preview — this shows up in your navbar and dashboard</span>
+              </div>
+            </div>
+          </div>
+          <div className="checkbox-row" style={{ marginBottom: 18, alignItems: 'flex-start' }}>
+            <input
+              type="checkbox"
+              id="agreedToTerms"
+              checked={form.agreedToTerms}
+              onChange={(e) => update('agreedToTerms', e.target.checked)}
+              required
+              style={{ marginTop: 3 }}
+            />
+            <label htmlFor="agreedToTerms" style={{ margin: 0 }}>
+              I agree to Landora's <Link to="/terms">Terms &amp; Conditions</Link> and <Link to="/privacy">Privacy Policy</Link>
+            </label>
           </div>
           <button className="btn-green" type="submit" disabled={submitting} style={{ width: '100%' }}>
             {submitting ? 'Creating account…' : 'Create account'}

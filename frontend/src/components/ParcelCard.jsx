@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import ScoreBadge from './ScoreBadge.jsx';
+import WishlistButton from './WishlistButton.jsx';
 
 function matchTier(score) {
   if (score >= 80) return 'match-high';
@@ -61,6 +62,9 @@ export default function ParcelCard({ parcel }) {
                 <FlipIcon />
               </button>
             )}
+            <div className="parcel-wishlist-slot">
+              <WishlistButton parcelId={parcel._id} />
+            </div>
           </div>
           <div className="parcel-body">
             <div className="parcel-location">{parcel.location}, {parcel.county}</div>

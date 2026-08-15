@@ -177,7 +177,7 @@ router.get(
       const origin = near ? countyCentroid(near) : null;
       const radiusKm = withinKm ? parseFloat(withinKm) : null;
 
-      const parcels = await Parcel.find(filter).populate('owner', 'name county');
+      const parcels = await Parcel.find(filter).populate('owner', 'name county profilePicture');
       const ranked = parcels
         .map((p) => {
           const plain = p.toObject();
@@ -215,7 +215,7 @@ router.get(
     let [parcels, total] = await Promise.all([
       Parcel.find(filter)
         .sort({ createdAt: -1 })
-        .populate('owner', 'name county'),
+        .populate('owner', 'name county profilePicture'),
       Parcel.countDocuments(filter),
     ]);
 
@@ -242,7 +242,7 @@ router.get(
 
 // Public: single parcel detail.
 router.get('/:id', cache.cacheGet(DETAIL_TTL_MS), async (req, res) => {
-  const parcel = await Parcel.findById(req.params.id).populate('owner', 'name county phone');
+  const parcel = await Parcel.findById(req.params.id).populate('owner', 'name county phone profilePicture');
   if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
   res.json({ parcel });
 });

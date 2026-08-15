@@ -20,6 +20,17 @@ const userSchema = new mongoose.Schema(
     },
     phone: { type: String, trim: true, maxlength: 20 },
     county: { type: String, trim: true, maxlength: 60 },
+    // Profile photo shown in the navbar, dashboards, and the parcel-detail owner card.
+    // Stored as a URL (same convention as parcel photos) — when empty the UI falls
+    // back to the bundled Landora logo mark.
+    profilePicture: { type: String, trim: true, maxlength: 2000, default: '' },
+    // Recorded at signup so there is an auditable record of acceptance. Enforced by
+    // the /auth/register route validation rather than a hard schema requirement, so
+    // internal tooling (e.g. scripts/createAdmin.js) can still create accounts.
+    agreedToTerms: { type: Boolean, default: false },
+    termsAgreedAt: { type: Date, default: null },
+    // Parcels this user has saved/wishlisted for later. Available to any role.
+    wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Parcel' }],
     emailVerified: { type: Boolean, default: false },
     phoneVerified: { type: Boolean, default: false },
     verificationPolicy: {
@@ -60,6 +71,9 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     role: this.role,
     phone: this.phone,
     county: this.county,
+    profilePicture: this.profilePicture || '',
+    agreedToTerms: this.agreedToTerms,
+    wishlist: (this.wishlist || []).map((id) => id.toString()),
     emailVerified: this.emailVerified,
     phoneVerified: this.phoneVerified,
     verificationPolicy: this.verificationPolicy,

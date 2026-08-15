@@ -1,6 +1,7 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
+const { body, query, validationResult } = require('express-validator');
 const Parcel = require('../models/Parcel');
+const Application = require('../models/Application');
 const AuthSettings = require('../models/AuthSettings');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const cache = require('../middleware/cache');
@@ -48,12 +49,12 @@ router.patch(
 
 // Admin: every listing, any status/owner, most recent first.
 router.get('/parcels', async (req, res) => {
-  const parcels = await Parcel.find({}).sort({ createdAt: -1 }).populate('owner', 'name email county');
+  const parcels = await Parcel.find({}).sort({ createdAt: -1 }).populate('owner', 'name email county profilePicture');
   res.json({ parcels });
 });
 
 router.get('/parcels/:id', async (req, res) => {
-  const parcel = await Parcel.findById(req.params.id).populate('owner', 'name email phone county');
+  const parcel = await Parcel.findById(req.params.id).populate('owner', 'name email phone county profilePicture');
   if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
   res.json({ parcel });
 });
@@ -168,5 +169,67 @@ router.delete('/parcels/:id', async (req, res) => {
   res.json({ ok: true });
   cache.invalidate('/api/parcels');
 });
+
+// Admin: every lease application across every landowner/parcel, most recent first.
+// Landowners can only view applications received on their own listings (see
+// GET /applications/received) — the Landora team is the one that qualifies and
+// decides applicants, not the landowner.
+router.get(
+  '/applications',
+  [
+    query('status').optional().isIn(['pending', 'accepted', 'declined', 'withdrawn']),
+    query('parcelId').optional().isMongoId(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Invalid filter parameters' });
+
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.parcelId) filter.parcel = req.query.parcelId;
+
+    const applications = await Application.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('parcel', 'title county location status')
+      .populate('farmer', 'name phone email county profilePicture')
+      .populate('landowner', 'name email county profilePicture');
+    res.json({ applications });
+  }
+);
+
+// Admin: accept or decline a lease application. This is the one and only place an
+// application's status can be decided — the landowner it was sent to can see it, but
+// qualifying and moving an applicant through is the Landora team's job.
+router.patch(
+  '/applications/:id/decision',
+  [
+    body('status').isIn(['accepted', 'declined']),
+    body('landownerNote').optional({ checkFalsy: true }).trim().isLength({ max: 2000 }),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Invalid decision' });
+
+    const application = await Application.findById(req.params.id);
+    if (!application) return res.status(404).json({ error: 'Application not found' });
+
+    application.status = req.body.status;
+    if (req.body.landownerNote !== undefined) application.landownerNote = req.body.landownerNote;
+    await application.save();
+
+    // Accepting a lease application takes the parcel off the market.
+    if (req.body.status === 'accepted') {
+      await Parcel.findByIdAndUpdate(application.parcel, { status: 'leased' });
+    }
+
+    const populated = await application.populate([
+      { path: 'parcel', select: 'title county location status' },
+      { path: 'farmer', select: 'name phone email county profilePicture' },
+    ]);
+
+    res.json({ application: populated });
+    cache.invalidate('/api/parcels');
+  }
+);
 
 module.exports = router;
