@@ -36,6 +36,32 @@ function StatCard({ label, value, note }) {
   );
 }
 
+// The video walkthrough URL an admin pastes in could be a direct file (.mp4) or a
+// link to YouTube/Vimeo — those only play through their embed iframe, not a native
+// <video> tag, which is why a YouTube link previously just showed a broken player.
+function getVideoEmbed(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '');
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
+      const id = u.searchParams.get('v') || u.pathname.split('/').pop();
+      if (id) return { type: 'iframe', src: `https://www.youtube.com/embed/${id}` };
+    }
+    if (host === 'youtu.be') {
+      const id = u.pathname.replace('/', '');
+      if (id) return { type: 'iframe', src: `https://www.youtube.com/embed/${id}` };
+    }
+    if (host === 'vimeo.com') {
+      const id = u.pathname.replace('/', '');
+      if (id) return { type: 'iframe', src: `https://player.vimeo.com/video/${id}` };
+    }
+  } catch {
+    // Not a valid absolute URL — fall through to treating it as a direct file below.
+  }
+  return { type: 'file', src: url };
+}
+
 export default function ParcelDetail() {
   const { id } = useParams();
   const { user, token } = useAuth();
@@ -148,6 +174,23 @@ export default function ParcelDetail() {
           </div>
         )}
 
+        {parcel.highlights && parcel.highlights.length > 0 && (
+          <div className="panel" style={{ marginBottom: 24 }}>
+            <div className="card-title" style={{ fontSize: 16, marginBottom: 12 }}>Highlights</div>
+            <ul className="highlight-list">
+              {parcel.highlights.map((h, i) => (
+                <li key={i}>
+                  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <circle cx="10" cy="10" r="10" fill="var(--g100)" />
+                    <path d="M6 10.2l2.5 2.5L14 7.5" stroke="var(--g700)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {h}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Key facts, plus landowner identity and land title verification — checked
             against the Ministry of Lands' Ardhisasa portal, or via a manual search
             when a parcel isn't yet reachable there. */}
@@ -209,7 +252,22 @@ export default function ParcelDetail() {
           <div className="panel" style={{ marginBottom: 24 }}>
             <div className="card-title" style={{ fontSize: 16, marginBottom: 12 }}>Video walkthrough</div>
             <div className="video-frame">
-              <video controls poster={parcel.photos && parcel.photos[0]} src={video.url} />
+              {(() => {
+                const embed = getVideoEmbed(video.url);
+                if (!embed) return null;
+                if (embed.type === 'iframe') {
+                  return (
+                    <iframe
+                      src={embed.src}
+                      title={video.caption || 'Parcel video walkthrough'}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      frameBorder="0"
+                    />
+                  );
+                }
+                return <video controls poster={parcel.photos && parcel.photos[0]} src={embed.src} />;
+              })()}
               {video.durationLabel && <span className="video-duration">{video.durationLabel}</span>}
             </div>
             {video.caption && <div style={{ fontWeight: 600, fontSize: 13, marginTop: 10 }}>{video.caption}</div>}

@@ -125,6 +125,14 @@ const parcelSchema = new mongoose.Schema(
     season: { type: String, trim: true, maxlength: 40 },
     tags: [{ type: String, trim: true, maxlength: 40 }],
     description: { type: String, trim: true, maxlength: 4000 },
+
+    // Short bullet highlights shown on the browse-land page and the listing detail
+    // page (e.g. "Borehole on site", "Title deed ready for transfer"). Written by an
+    // admin during the enrichment pass — landowners never set these directly.
+    highlights: {
+      type: [{ type: String, trim: true, maxlength: 160 }],
+      validate: [(arr) => arr.length <= 8, 'A parcel can have at most 8 highlights'],
+    },
     photos: {
       type: [{ type: String, trim: true }],
       validate: [(arr) => arr.length <= 6, 'A parcel can have at most 6 photos'],

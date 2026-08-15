@@ -1,5 +1,12 @@
 require('dotenv').config();
 const express = require('express');
+// Express 4's router does NOT forward rejected promises from async route handlers to
+// the error middleware — an unhandled rejection (e.g. a Mongoose validation error on
+// save()) just leaves the request hanging with no response, which surfaces in the
+// browser as a generic "failed to fetch" / network error with no useful message. This
+// patches every route handler registered after this line so thrown/rejected errors are
+// always forwarded to next(err) and answered by the central error handler below.
+require('express-async-errors');
 const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -16,17 +23,23 @@ const app = express();
 
 app.use(helmet());
 app.use(morgan('dev'));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '2mb' }));
 
+// Trailing slashes are an easy way for CORS_ORIGINS to silently stop matching (an env
+// var of "https://app.example.com/" will never equal the browser's Origin header,
+// which never includes a trailing slash) — normalize both sides so that mismatch can't
+// quietly turn into every admin request failing as a CORS-blocked "failed to fetch".
+const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
   .split(',')
-  .map((o) => o.trim());
+  .map(normalizeOrigin)
+  .filter(Boolean);
 
 app.use(
   cors({
     origin(origin, callback) {
       // Allow non-browser requests (e.g. curl, server-to-server) with no origin header.
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) return callback(null, true);
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -54,11 +67,27 @@ app.use('/api/admin', adminRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
-// Central error handler — keeps stack traces out of API responses.
+// Central error handler — keeps stack traces out of API responses, and now that
+// express-async-errors forwards every rejected promise here, this is what turns a
+// Mongoose save() failure into a real JSON error the admin editor can display instead
+// of a hung request that looks like "failed to fetch" in the browser.
 app.use((err, req, res, next) => {
   console.error(err);
   if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({ error: 'Origin not allowed' });
+  }
+  if (err.name === 'ValidationError') {
+    const firstField = Object.values(err.errors || {})[0];
+    return res.status(400).json({ error: firstField ? firstField.message : 'Validation failed' });
+  }
+  if (err.name === 'CastError') {
+    return res.status(400).json({ error: `Invalid value for ${err.path}` });
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'That request was too large' });
+  }
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Malformed request body' });
   }
   res.status(500).json({ error: 'Internal server error' });
 });

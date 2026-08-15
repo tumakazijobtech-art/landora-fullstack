@@ -94,6 +94,7 @@ router.patch(
     body('productivityReport').optional().isObject(),
     body('mapData').optional().isObject(),
     body('videoWalkthrough').optional().isObject(),
+    body('highlights').optional().isArray({ max: 8 }),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -104,7 +105,14 @@ router.patch(
     const parcel = await Parcel.findById(req.params.id);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
-    const { score, keyFacts, titleVerification, productivityReport, mapData, videoWalkthrough, markEnriched } = req.body;
+    const { score, keyFacts, titleVerification, productivityReport, mapData, videoWalkthrough, highlights, markEnriched } = req.body;
+
+    if (highlights !== undefined) {
+      parcel.highlights = highlights
+        .map((h) => String(h || '').trim())
+        .filter(Boolean)
+        .slice(0, 8);
+    }
 
     if (score !== undefined) parcel.score = score;
 

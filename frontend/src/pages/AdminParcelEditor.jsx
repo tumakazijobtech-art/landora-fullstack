@@ -44,6 +44,7 @@ export default function AdminParcelEditor() {
   const [centroidLng, setCentroidLng] = useState('');
   const [video, setVideo] = useState({});
   const [photosText, setPhotosText] = useState('');
+  const [highlightsText, setHighlightsText] = useState('');
 
   useEffect(() => {
     api.adminGetParcel(id, token)
@@ -65,6 +66,7 @@ export default function AdminParcelEditor() {
         setCentroidLng(p.mapData?.centroidLng ?? '');
         setVideo(p.videoWalkthrough || {});
         setPhotosText((p.photos || []).join(', '));
+        setHighlightsText((p.highlights || []).join('\n'));
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -185,6 +187,7 @@ export default function AdminParcelEditor() {
           caption: video.caption,
           durationLabel: video.durationLabel,
         },
+        highlights: highlightsText.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 8),
       }, token);
 
       setSaved('Saved. This listing now reflects everywhere it appears on the site.');
@@ -318,6 +321,18 @@ export default function AdminParcelEditor() {
               <div className="field-row">
                 <div className="field"><label>Financing detail</label><input value={keyFacts.financingDetail || ''} onChange={(e) => updateKeyFacts('financingDetail', e.target.value)} /></div>
                 <div className="field"><label>Insurance detail</label><input value={keyFacts.insuranceDetail || ''} onChange={(e) => updateKeyFacts('insuranceDetail', e.target.value)} /></div>
+              </div>
+              <div className="field">
+                <label>Listing highlights — one per line, shown as bullets on the browse page and listing</label>
+                <textarea
+                  rows={5}
+                  value={highlightsText}
+                  onChange={(e) => setHighlightsText(e.target.value)}
+                  placeholder={'Title deed ready for transfer\nBorehole and gravity-fed water on site\nAll-weather road access\nZoned for horticulture and mixed cropping'}
+                />
+                <div style={{ fontSize: 12, color: 'var(--s500)', marginTop: 4 }}>
+                  {highlightsText.split('\n').map((s) => s.trim()).filter(Boolean).length} / 8 highlights
+                </div>
               </div>
             </div>
           </div>
