@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getBranding, subscribeToBranding } from '../branding.js';
 import { SparkleIcon, ChatIcon } from './Icons.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Floating assistant launcher for the marketplace page. In production this posts each
 // message to Landora's own assistant service and shows its reply. Without that
@@ -54,6 +55,7 @@ function fallbackReply(text) {
 }
 
 export default function AIAgentWidget() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [branding, setBrandingState] = useState(getBranding);
   const [messages, setMessages] = useState([
@@ -106,7 +108,7 @@ export default function AIAgentWidget() {
   }
 
   return (
-    <div className="ai-agent-widget">
+    <div className={`ai-agent-widget${user ? ' ai-agent-widget-with-tabbar' : ''}`}>
       {open && (
         <div className="ai-agent-panel">
           <div className="ai-agent-head">

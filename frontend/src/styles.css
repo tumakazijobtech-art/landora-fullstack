@@ -166,27 +166,38 @@ table.data-table td{padding:12px;border-bottom:1px solid var(--s100)}
 .nav-scrim{position:fixed;inset:0;background:rgba(32,38,31,0.28);z-index:98}
 
 /* On mobile, the navbar moves from the top of the screen to the bottom (thumb
-   reachable, app-like). For logged-in users it stacks directly above the app-style
-   BottomNav tab bar instead of overlapping it; logged-out users just get the navbar
-   pinned to the bottom on its own. The dropdown menu opens upward above the bar. */
+   reachable, app-like) for logged-out visitors, whose only bottom bar it is. Logged-in
+   users already get the app-style BottomNav tab bar for primary navigation, so instead
+   of stacking a second full-width bar underneath it (which ate a large chunk of the
+   viewport), the navbar stays docked at the top for them — just the hamburger for
+   secondary items like admin links and log out, opening as a normal top dropdown. */
 @media (max-width:760px){
   .nav-hamburger{display:flex}
   nav{
-    position:fixed;top:auto;bottom:0;left:0;right:0;height:60px;
+    position:fixed;top:auto;bottom:0;left:0;right:0;height:60px;z-index:110;
     border-bottom:none;border-top:1px solid var(--s100);
     padding-bottom:env(safe-area-inset-bottom);
   }
-  nav.nav-stacked{bottom:calc(64px + env(safe-area-inset-bottom))}
+  nav.nav-stacked{
+    position:sticky;top:0;bottom:auto;height:60px;z-index:100;
+    border-top:none;border-bottom:1px solid var(--s100);
+    padding-bottom:0;
+  }
   .nav-links{
     position:fixed;bottom:60px;left:0;right:0;background:var(--w);
     flex-direction:column;align-items:stretch;gap:2px;padding:10px 1rem 18px;
-    max-height:0;overflow:hidden;transition:max-height 0.22s ease;z-index:99;
+    max-height:0;overflow:hidden;transition:max-height 0.22s ease;z-index:150;
     border-top:1px solid var(--s100);border-bottom:none;
   }
-  nav.nav-stacked .nav-links{bottom:calc(60px + 64px + env(safe-area-inset-bottom))}
+  nav.nav-stacked .nav-links{
+    top:60px;bottom:auto;
+    border-top:none;border-bottom:1px solid var(--s100);
+    box-shadow:0 12px 24px rgba(32,38,31,.1);
+  }
   .nav-links.nav-links-open{max-height:480px;overflow:auto}
   .nav-links .nav-link,.nav-links .nav-cta{width:100%;text-align:left;padding:12px 10px}
   .nav-avatar-link{margin-left:0}
+  .nav-scrim{z-index:140}
   .field-row{grid-template-columns:1fr}
   .hero-h1{font-size:32px}
   .section-h2{font-size:24px}
@@ -631,11 +642,12 @@ table.data-table td{padding:12px;border-bottom:1px solid var(--s100)}
 /* ---------- Fixed bottom navigation (mobile, logged-in) ---------- */
 .bottom-nav{display:none}
 @media (max-width:760px){
-  /* The relocated navbar (60px) always sits at the bottom on mobile; logged-in users
-     also get the app-style bottom-nav (64px) stacked underneath it, so content needs
-     enough bottom padding to clear whichever combination is on screen. */
+  /* Logged-out visitors get the relocated navbar (60px) pinned to the bottom, so
+     content needs padding to clear it. Logged-in users instead get the navbar back at
+     the top (in normal flow, no padding needed for it) plus the app-style bottom-nav
+     (64px) fixed at the bottom, so only that needs to be cleared. */
   .nav-bottom-spacer{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
-  .nav-bottom-spacer.has-bottom-nav-spacer{padding-bottom:calc(60px + 64px + env(safe-area-inset-bottom))}
+  .nav-bottom-spacer.has-bottom-nav-spacer{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
   .bottom-nav{
     display:flex;position:fixed;left:0;right:0;bottom:0;z-index:120;
     background:var(--w);border-top:1px solid var(--s100);
@@ -772,5 +784,12 @@ table.data-table td{padding:12px;border-bottom:1px solid var(--s100)}
 
 @media (max-width:640px){
   .hero-report-flip-inner{min-height:400px}
-  .ai-agent-widget{right:14px;bottom:16px}
+}
+
+/* Keep the launcher clear of whichever fixed mobile bar is on screen: the app-style
+   bottom-nav (64px) for logged-in users, or the relocated navbar (60px) for logged-out
+   visitors — instead of a flat offset that could sit under either one. */
+@media (max-width:760px){
+  .ai-agent-widget{right:14px;bottom:calc(60px + env(safe-area-inset-bottom) + 14px);z-index:130}
+  .ai-agent-widget.ai-agent-widget-with-tabbar{bottom:calc(64px + env(safe-area-inset-bottom) + 14px)}
 }
