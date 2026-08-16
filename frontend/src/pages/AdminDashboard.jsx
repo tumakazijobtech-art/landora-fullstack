@@ -171,6 +171,19 @@ function ApplicationsPanel({ token }) {
     }
   }
 
+  async function withdraw(id) {
+    setBusyId(id);
+    setError('');
+    try {
+      await api.adminWithdrawApplication(id, token);
+      await load(statusFilter);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div>
       <div className="filter-bar">
@@ -213,13 +226,20 @@ function ApplicationsPanel({ token }) {
               {a.intendedCrop && <div style={{ fontSize: 13, marginTop: 8 }}>Intended crop: {a.intendedCrop}</div>}
               {a.seasonsRequested && <div style={{ fontSize: 13 }}>Seasons requested: {a.seasonsRequested}</div>}
               {a.message && <div style={{ fontSize: 13, marginTop: 8, color: 'var(--s700)' }}>"{a.message}"</div>}
-              {a.status === 'pending' && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button className="btn-green" disabled={busyId === a._id} onClick={() => decide(a._id, 'accepted')}>
-                    {busyId === a._id ? 'Working…' : 'Accept'}
-                  </button>
-                  <button className="btn-outline-green" disabled={busyId === a._id} onClick={() => decide(a._id, 'declined')}>
-                    Decline
+              {(a.status === 'pending' || a.status === 'accepted') && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  {a.status === 'pending' && (
+                    <>
+                      <button className="btn-green" disabled={busyId === a._id} onClick={() => decide(a._id, 'accepted')}>
+                        {busyId === a._id ? 'Working…' : 'Accept'}
+                      </button>
+                      <button className="btn-outline-green" disabled={busyId === a._id} onClick={() => decide(a._id, 'declined')}>
+                        Decline
+                      </button>
+                    </>
+                  )}
+                  <button className="btn-outline-green" disabled={busyId === a._id} onClick={() => withdraw(a._id)}>
+                    {busyId === a._id ? 'Working…' : 'Withdraw'}
                   </button>
                 </div>
               )}

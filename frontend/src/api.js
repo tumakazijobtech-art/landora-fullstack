@@ -88,7 +88,6 @@ export const api = {
 
   applyToParcel: (payload, token) => request('/applications', { method: 'POST', body: payload, token }),
   myApplications: (token) => request('/applications/mine', { token }),
-  withdrawApplication: (id, token) => request(`/applications/${id}/withdraw`, { method: 'PATCH', token }),
   receivedApplications: (token, parcelId) =>
     request(`/applications/received${parcelId ? `?parcelId=${parcelId}` : ''}`, { token }),
 
@@ -148,6 +147,8 @@ export const api = {
   },
   adminDecideApplication: (id, payload, token) =>
     request(`/admin/applications/${id}/decision`, { method: 'PATCH', body: payload, token }),
+  adminWithdrawApplication: (id, token) =>
+    request(`/admin/applications/${id}/withdraw`, { method: 'PATCH', token }),
 
   // Join the waitlist popup, and parcel level pre booking — public, no login needed.
   joinWaitlist: (payload) => request('/waitlist', { method: 'POST', body: payload }),

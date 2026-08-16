@@ -91,7 +91,7 @@ export default function LandoraTour() {
 
                 {tab.isVideo && (
                   <div className="tour-play-btn" aria-hidden="true">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8 5.5v13l11-6.5-11-6.5z" fill="#0D2B14" /></svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8 5.5v13l11-6.5-11-6.5z" fill="#20261F" /></svg>
                   </div>
                 )}
               </div>

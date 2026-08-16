@@ -21,15 +21,6 @@ export default function FarmerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleWithdraw(id) {
-    try {
-      await api.withdrawApplication(id, token);
-      await load();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
   if (loading) return <div className="section"><div className="section-inner">Loading…</div></div>;
 
   return (
@@ -63,9 +54,9 @@ export default function FarmerDashboard() {
                   </div>
                 )}
                 {a.status === 'pending' && (
-                  <button className="btn-outline-green" style={{ marginTop: 12 }} onClick={() => handleWithdraw(a._id)}>
-                    Withdraw application
-                  </button>
+                  <div style={{ fontSize: 12, marginTop: 12, color: 'var(--s500)' }}>
+                    To withdraw this application, please contact the Landora team — withdrawals require admin approval.
+                  </div>
                 )}
               </div>
             ))}

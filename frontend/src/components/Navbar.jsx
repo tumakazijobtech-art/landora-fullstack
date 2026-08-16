@@ -27,7 +27,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav>
+    <nav className={user ? 'nav-stacked' : undefined}>
       <div className="nav-inner">
         <Link className="nav-brand" to="/">
           <img className="nav-logo" src={appLogoUrl} alt="Landora" width="32" height="32" />

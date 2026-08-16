@@ -93,17 +93,9 @@ router.get('/mine', requireAuth, requireRole('farmer'), async (req, res) => {
   res.json({ applications });
 });
 
-// Farmer: withdraw an application.
-router.patch('/:id/withdraw', requireAuth, requireRole('farmer'), async (req, res) => {
-  const application = await Application.findById(req.params.id);
-  if (!application) return res.status(404).json({ error: 'Application not found' });
-  if (application.farmer.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ error: 'Not your application' });
-  }
-  application.status = 'withdrawn';
-  await application.save();
-  res.json({ application });
-});
+// Note: farmers can no longer withdraw their own applications directly.
+// Withdrawing an application now requires admin approval — see
+// PATCH /admin/applications/:id/withdraw in routes/admin.js.
 
 // Landowner: view applications received, optionally filtered by parcel. Landowners
 // can see who has applied and the status/notes of each application, but the

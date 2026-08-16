@@ -240,6 +240,26 @@ router.patch(
   }
 );
 
+// Admin: withdraw an application on a farmer's behalf. Farmers can no longer
+// withdraw their own applications directly — any withdrawal now requires
+// admin approval and goes through this endpoint.
+router.patch('/applications/:id/withdraw', async (req, res) => {
+  const application = await Application.findById(req.params.id);
+  if (!application) return res.status(404).json({ error: 'Application not found' });
+
+  application.status = 'withdrawn';
+  await application.save();
+
+  const populated = await application.populate([
+    { path: 'parcel', select: 'title county location status' },
+    { path: 'farmer', select: 'name phone email county profilePicture' },
+    { path: 'landowner', select: 'name email county profilePicture' },
+  ]);
+
+  res.json({ application: populated });
+  cache.invalidate('/api/parcels');
+});
+
 // Admin: every waitlist / pre booking submission, most recent first. This is what
 // makes the "join the waitlist" popup and a parcel's "pre book" CTA reflect straight
 // into the admin console, on top of the admin notification email.

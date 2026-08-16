@@ -1,6 +1,6 @@
 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Landora logo">
-  <rect width="64" height="64" rx="16" fill="#1F5137"/>
-  <path d="M32 10c-9 8-14 16-14 24a14 14 0 0 0 28 0c0-8-5-16-14-24z" fill="#EAF3EC"/>
-  <path d="M32 16v32" stroke="#3E7A54" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M32 24c-4-3-8-3-10-1M32 33c-5-3-9-2-11 0M32 24c4-3 8-3 10-1M32 33c5-3 9-2 11 0" stroke="#3E7A54" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+  <rect width="64" height="64" rx="16" fill="#2B332A"/>
+  <path d="M32 10c-9 8-14 16-14 24a14 14 0 0 0 28 0c0-8-5-16-14-24z" fill="#F2F4F0"/>
+  <path d="M32 16v32" stroke="#657460" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M32 24c-4-3-8-3-10-1M32 33c-5-3-9-2-11 0M32 24c4-3 8-3 10-1M32 33c5-3 9-2 11 0" stroke="#657460" stroke-width="2.2" stroke-linecap="round" fill="none"/>
 </svg>

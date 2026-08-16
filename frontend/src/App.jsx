@@ -45,7 +45,7 @@ export default function App() {
   return (
     <>
       <Navbar />
-      <div className={user ? 'has-bottom-nav-spacer' : undefined}>
+      <div className={`nav-bottom-spacer${user ? ' has-bottom-nav-spacer' : ''}`}>
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/" element={<Home />} />
