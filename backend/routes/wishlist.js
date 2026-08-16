@@ -11,7 +11,7 @@ router.use(requireAuth);
 // List my saved parcels, most-recently-saved first.
 router.get('/', async (req, res) => {
   const ids = [...(req.user.wishlist || [])].reverse();
-  const parcels = await Parcel.find({ _id: { $in: ids } }).populate('owner', 'name county profilePicture');
+  const parcels = await Parcel.find({ _id: { $in: ids } }).populate('owner', 'name county profilePicture').lean();
   // Preserve the most-recently-saved-first order from the user's wishlist array.
   const order = new Map(ids.map((id, i) => [id.toString(), i]));
   parcels.sort((a, b) => (order.get(a._id.toString()) ?? 0) - (order.get(b._id.toString()) ?? 0));

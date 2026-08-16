@@ -8,6 +8,7 @@ const express = require('express');
 // always forwarded to next(err) and answered by the central error handler below.
 require('express-async-errors');
 const helmet = require('helmet');
+const compression = require('compression');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
@@ -24,6 +25,12 @@ const waitlistRoutes = require('./routes/waitlist');
 const app = express();
 
 app.use(helmet());
+// Gzip/brotli-negotiated compression for every JSON response — the marketplace list
+// and parcel detail payloads (photos arrays, productivity reports, etc.) are the
+// biggest responses this API sends, so this is a straightforward win for load time
+// on slower connections. Skipped automatically for tiny responses (below the default
+// 1kb threshold) where compressing would cost more than it saves.
+app.use(compression());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '2mb' }));
 

@@ -89,7 +89,8 @@ router.post(
 router.get('/mine', requireAuth, requireRole('farmer'), async (req, res) => {
   const applications = await Application.find({ farmer: req.user._id })
     .sort({ createdAt: -1 })
-    .populate('parcel', 'title county location pricePerAcrePerSeason sizeAcres photos status');
+    .populate('parcel', 'title county location pricePerAcrePerSeason sizeAcres photos status')
+    .lean();
   res.json({ applications });
 });
 
@@ -108,7 +109,8 @@ router.get('/received', requireAuth, requireRole('landowner'), async (req, res) 
   const applications = await Application.find(filter)
     .sort({ createdAt: -1 })
     .populate('parcel', 'title county location')
-    .populate('farmer', 'name phone email county profilePicture');
+    .populate('farmer', 'name phone email county profilePicture')
+    .lean();
   res.json({ applications });
 });
 

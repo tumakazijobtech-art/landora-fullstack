@@ -50,12 +50,12 @@ router.patch(
 
 // Admin: every listing, any status/owner, most recent first.
 router.get('/parcels', async (req, res) => {
-  const parcels = await Parcel.find({}).sort({ createdAt: -1 }).populate('owner', 'name email county profilePicture');
+  const parcels = await Parcel.find({}).sort({ createdAt: -1 }).populate('owner', 'name email county profilePicture').lean();
   res.json({ parcels });
 });
 
 router.get('/parcels/:id', async (req, res) => {
-  const parcel = await Parcel.findById(req.params.id).populate('owner', 'name email phone county profilePicture');
+  const parcel = await Parcel.findById(req.params.id).populate('owner', 'name email phone county profilePicture').lean();
   if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
   res.json({ parcel });
 });
@@ -200,7 +200,8 @@ router.get(
       .sort({ createdAt: -1 })
       .populate('parcel', 'title county location status')
       .populate('farmer', 'name phone email county profilePicture')
-      .populate('landowner', 'name email county profilePicture');
+      .populate('landowner', 'name email county profilePicture')
+      .lean();
     res.json({ applications });
   }
 );
@@ -269,7 +270,8 @@ router.get('/waitlist', async (req, res) => {
   if (req.query.status) filter.status = req.query.status;
   const entries = await WaitlistEntry.find(filter)
     .sort({ createdAt: -1 })
-    .populate('parcel', 'title county location season slug');
+    .populate('parcel', 'title county location season slug')
+    .lean();
   res.json({ entries });
 });
 

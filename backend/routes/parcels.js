@@ -223,8 +223,8 @@ router.get(
       const origin = near ? countyCentroid(near) : null;
       const radiusKm = withinKm ? parseFloat(withinKm) : null;
 
-      const parcels = await Parcel.find(filter).populate('owner', 'name county profilePicture');
-      const withCounts = await withApplicantCounts(parcels.map((p) => p.toObject()));
+      const parcels = await Parcel.find(filter).populate('owner', 'name county profilePicture').lean();
+      const withCounts = await withApplicantCounts(parcels);
       const ranked = withCounts
         .map((plain) => {
           const { matchScore, matchReasons } = scoreMatch(plain, {
@@ -261,7 +261,8 @@ router.get(
     let [parcels, total] = await Promise.all([
       Parcel.find(filter)
         .sort({ createdAt: -1 })
-        .populate('owner', 'name county profilePicture'),
+        .populate('owner', 'name county profilePicture')
+        .lean(),
       Parcel.countDocuments(filter),
     ]);
 
@@ -280,7 +281,7 @@ router.get(
     }
 
     const start = (page - 1) * limit;
-    const pageItems = await withApplicantCounts(parcels.slice(start, start + limit).map((p) => p.toObject()));
+    const pageItems = await withApplicantCounts(parcels.slice(start, start + limit));
 
     res.json({ parcels: pageItems, total, page, pages: Math.ceil(total / limit) || 1 });
   }
@@ -303,7 +304,7 @@ router.get(
     const { county, crop, waterAccess, financingAvailable } = req.query;
 
     async function pricesFor(filter) {
-      const rows = await Parcel.find(filter).select('pricePerAcrePerSeason').limit(200);
+      const rows = await Parcel.find(filter).select('pricePerAcrePerSeason').limit(200).lean();
       return rows.map((r) => r.pricePerAcrePerSeason).filter((n) => typeof n === 'number' && n > 0);
     }
 
@@ -364,9 +365,9 @@ router.get('/:idOrSlug', cache.cacheGet(DETAIL_TTL_MS), async (req, res) => {
   await expireDeadlines();
   const { idOrSlug } = req.params;
   const lookup = isObjectId(idOrSlug) ? { _id: idOrSlug } : { slug: idOrSlug };
-  const parcel = await Parcel.findOne(lookup).populate('owner', 'name county phone profilePicture');
+  const parcel = await Parcel.findOne(lookup).populate('owner', 'name county phone profilePicture').lean();
   if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
-  const [withCount] = await withApplicantCounts([parcel.toObject()]);
+  const [withCount] = await withApplicantCounts([parcel]);
   res.json({ parcel: withCount });
 });
 
@@ -434,14 +435,14 @@ router.post(
 
 // Landowner: list my own parcels (any status), with application counts.
 router.get('/mine/list', requireAuth, requireRole('landowner'), async (req, res) => {
-  const parcels = await Parcel.find({ owner: req.user._id }).sort({ createdAt: -1 });
+  const parcels = await Parcel.find({ owner: req.user._id }).sort({ createdAt: -1 }).lean();
   const counts = await Application.aggregate([
     { $match: { landowner: req.user._id } },
     { $group: { _id: '$parcel', count: { $sum: 1 } } },
   ]);
   const countMap = Object.fromEntries(counts.map((c) => [c._id.toString(), c.count]));
   res.json({
-    parcels: parcels.map((p) => ({ ...p.toObject(), applicationCount: countMap[p._id.toString()] || 0 })),
+    parcels: parcels.map((p) => ({ ...p, applicationCount: countMap[p._id.toString()] || 0 })),
   });
 });
 

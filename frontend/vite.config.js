@@ -9,4 +9,19 @@ export default defineConfig({
       '/api': 'http://localhost:4000',
     },
   },
+  build: {
+    // Split rarely-changing vendor code (React, the router) into its own chunk, apart
+    // from app code, so a deploy that only touches app code doesn't force browsers to
+    // re-download React too — repeat visits after an update stay mostly cache hits.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+    // Silence the default 500kb warning for the vendor chunk — React itself accounts
+    // for most of it and splitting further wouldn't reduce actual bytes shipped.
+    chunkSizeWarningLimit: 600,
+  },
 });

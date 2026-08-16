@@ -11,13 +11,13 @@ const LIST_TTL_MS = 5 * 60 * 1000; // land uses change rarely — cache generous
 // marketplace filter, and Landora Match. Adapts automatically as admins add/retire
 // options — nothing here is hardcoded in the frontend.
 router.get('/', cache.cacheGet(LIST_TTL_MS), async (req, res) => {
-  const landUses = await LandUse.find({ active: true }).sort({ sortOrder: 1, name: 1 });
+  const landUses = await LandUse.find({ active: true }).sort({ sortOrder: 1, name: 1 }).lean();
   res.json({ landUses });
 });
 
 // Admin: full list including inactive, for the management screen.
 router.get('/all', requireAuth, requireRole('admin'), async (req, res) => {
-  const landUses = await LandUse.find({}).sort({ sortOrder: 1, name: 1 });
+  const landUses = await LandUse.find({}).sort({ sortOrder: 1, name: 1 }).lean();
   res.json({ landUses });
 });
 
