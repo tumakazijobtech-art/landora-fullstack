@@ -136,12 +136,13 @@ export default function AdminParcelEditor() {
         status: base.status,
         score,
         tags: base.tags || [],
-        photos: photosText.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 6),
+        photos: photosText.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 50),
         financingAvailable: !!base.financingAvailable,
         insured: !!base.insured,
         waterAccess: !!base.waterAccess,
         leaseDeadline: base.leaseDeadline || null,
         preBookingEnabled: base.preBookingEnabled !== false,
+        maxApplicants: base.maxApplicants ? Number(base.maxApplicants) : 20,
       }, token);
 
       await api.adminEnrichParcel(id, {
@@ -296,11 +297,24 @@ export default function AdminParcelEditor() {
                 <input type="checkbox" id="adminPreBooking" checked={base.preBookingEnabled !== false} onChange={(e) => updateBase('preBookingEnabled', e.target.checked)} />
                 <label htmlFor="adminPreBooking" style={{ margin: 0 }}>Allow pre booking ahead of the next season</label>
               </div>
+              <div className="field-row">
+                <div className="field">
+                  <label>Maximum bidders for this parcel</label>
+                  <input
+                    type="number" min={1} max={500}
+                    value={base.maxApplicants ?? 20}
+                    onChange={(e) => updateBase('maxApplicants', e.target.value ? Number(e.target.value) : 20)}
+                  />
+                  <div style={{ fontSize: 11.5, color: 'var(--s500)', marginTop: 6 }}>
+                    Shown to farmers as bidding spots remaining. Defaults to 20, set this to change the cap for this listing only.
+                  </div>
+                </div>
+              </div>
               <div className="field">
-                <label>Photo URLs, comma separated (up to 6, these auto slide on the listing)</label>
+                <label>Photo URLs, comma separated, up to 50, these auto slide on the listing</label>
                 <input value={photosText} onChange={(e) => setPhotosText(e.target.value)} placeholder="https://..., https://..." />
                 <div style={{ fontSize: 12, color: 'var(--s500)', marginTop: 4 }}>
-                  {photosText.split(',').map((s) => s.trim()).filter(Boolean).length} / 6 photos
+                  {photosText.split(',').map((s) => s.trim()).filter(Boolean).length} / 50 photos
                 </div>
               </div>
               <div className="field">

@@ -63,26 +63,33 @@ router.get('/parcels/:id', async (req, res) => {
 // Admin: full edit of any listing field, including the base fields a landowner
 // submitted (title, price, photos, etc). Use PATCH /parcels/:id/enrich for the
 // GIS/key-facts/video pass specifically.
-router.patch('/parcels/:id', async (req, res) => {
-  const parcel = await Parcel.findById(req.params.id);
-  if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+router.patch(
+  '/parcels/:id',
+  [body('maxApplicants').optional({ checkFalsy: true }).isInt({ min: 1, max: 500 })],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
-  const editable = [
-    'title', 'reference', 'county', 'location', 'sizeAcres', 'totalAcres', 'pricePerAcrePerSeason',
-    'crop', 'season', 'tags', 'description', 'photos', 'financingAvailable', 'insured', 'waterAccess',
-    'status', 'score', 'leaseDeadline', 'preBookingEnabled',
-  ];
-  editable.forEach((field) => {
-    if (req.body[field] !== undefined) parcel[field] = req.body[field];
-  });
-  if (Array.isArray(parcel.photos) && parcel.photos.length > 6) {
-    parcel.photos = parcel.photos.slice(0, 6);
+    const parcel = await Parcel.findById(req.params.id);
+    if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+
+    const editable = [
+      'title', 'reference', 'county', 'location', 'sizeAcres', 'totalAcres', 'pricePerAcrePerSeason',
+      'crop', 'season', 'tags', 'description', 'photos', 'financingAvailable', 'insured', 'waterAccess',
+      'status', 'score', 'leaseDeadline', 'preBookingEnabled', 'maxApplicants',
+    ];
+    editable.forEach((field) => {
+      if (req.body[field] !== undefined) parcel[field] = req.body[field];
+    });
+    if (Array.isArray(parcel.photos) && parcel.photos.length > 50) {
+      parcel.photos = parcel.photos.slice(0, 50);
+    }
+
+    await parcel.save();
+    res.json({ parcel });
+    cache.invalidate('/api/parcels');
   }
-
-  await parcel.save();
-  res.json({ parcel });
-  cache.invalidate('/api/parcels');
-});
+);
 
 // Admin: the internal enrichment pass — verified key facts, the GIS productivity
 // report (including the parcel map), and the video walkthrough. This is the "second

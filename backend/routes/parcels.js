@@ -30,11 +30,12 @@ async function withApplicantCounts(parcels) {
   const countMap = Object.fromEntries(counts.map((c) => [c._id.toString(), c.count]));
   return parcels.map((p) => {
     const applicantCount = countMap[p._id.toString()] || 0;
+    const maxApplicants = p.maxApplicants || MAX_APPLICANTS;
     return {
       ...p,
       applicantCount,
-      maxApplicants: MAX_APPLICANTS,
-      spotsRemaining: Math.max(0, MAX_APPLICANTS - applicantCount),
+      maxApplicants,
+      spotsRemaining: Math.max(0, maxApplicants - applicantCount),
     };
   });
 }
@@ -388,7 +389,7 @@ router.post(
     body('reference').optional({ checkFalsy: true }).trim(),
     body('description').optional({ checkFalsy: true }).trim().isLength({ max: 4000 }),
     body('tags').optional().isArray(),
-    body('photos').optional().isArray({ max: 6 }),
+    body('photos').optional().isArray({ max: 50 }),
     body('financingAvailable').optional().isBoolean(),
     body('insured').optional().isBoolean(),
     body('waterAccess').optional().isBoolean(),
@@ -417,7 +418,7 @@ router.post(
       reference: reference || generateReference(county, location),
       description,
       tags: cleanTags,
-      photos: Array.isArray(photos) ? photos.slice(0, 6) : [],
+      photos: Array.isArray(photos) ? photos.slice(0, 50) : [],
       financingAvailable: !!financingAvailable,
       insured: !!insured,
       waterAccess: !!waterAccess,
@@ -462,8 +463,8 @@ router.patch('/:id', requireAuth, requireRole('landowner'), async (req, res) => 
   editable.forEach((field) => {
     if (req.body[field] !== undefined) parcel[field] = req.body[field];
   });
-  if (Array.isArray(parcel.photos) && parcel.photos.length > 6) {
-    parcel.photos = parcel.photos.slice(0, 6);
+  if (Array.isArray(parcel.photos) && parcel.photos.length > 50) {
+    parcel.photos = parcel.photos.slice(0, 50);
   }
 
   await parcel.save();

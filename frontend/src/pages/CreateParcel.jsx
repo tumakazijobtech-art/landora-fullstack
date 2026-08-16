@@ -44,8 +44,8 @@ export default function CreateParcel() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    if (photoCount > 6) {
-      setError('You can add up to 6 photos per listing.');
+    if (photoCount > 50) {
+      setError('You can add up to 50 photos per listing.');
       return;
     }
     setSubmitting(true);
@@ -54,7 +54,7 @@ export default function CreateParcel() {
         ...form,
         sizeAcres: parseFloat(form.sizeAcres),
         pricePerAcrePerSeason: parseFloat(form.pricePerAcrePerSeason),
-        photos: form.photos.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 6),
+        photos: form.photos.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 50),
       };
       await api.createParcel(payload, token);
       navigate('/dashboard');
@@ -149,10 +149,10 @@ export default function CreateParcel() {
                 <input value={form.reference} onChange={(e) => update('reference', e.target.value)} />
               </div>
               <div className="field">
-                <label>Photo URLs, comma separated (up to 6, these auto slide on your listing)</label>
+                <label>Photo URLs, comma separated, up to 50, these auto slide on your listing</label>
                 <input value={form.photos} onChange={(e) => update('photos', e.target.value)} placeholder="https://..., https://..." />
-                <div style={{ fontSize: 12, color: photoCount > 6 ? '#A3392A' : 'var(--s500)', marginTop: 4 }}>
-                  {photoCount} / 6 photos
+                <div style={{ fontSize: 12, color: photoCount > 50 ? '#A3392A' : 'var(--s500)', marginTop: 4 }}>
+                  {photoCount} / 50 photos
                 </div>
               </div>
               <div className="field">

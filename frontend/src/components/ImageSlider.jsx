@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 // Auto-slides through the parcel video walkthrough (when there is one, always first)
-// and up to 6 photos, pausing on hover/focus and while a drag/swipe is in progress,
+// and up to 50 photos, pausing on hover/focus and while a drag/swipe is in progress,
 // and while the video slide is showing (nobody wants an auto-advancing video). Falls
 // back to a single frame when there's only one item total.
 export default function ImageSlider({ images = [], altPrefix = 'Photo', captions = [], video = null, intervalMs = 4500 }) {
-  const photoSlides = (images || []).slice(0, 6).map((src, i) => ({ type: 'image', src, caption: captions[i] }));
+  const photoSlides = (images || []).slice(0, 50).map((src, i) => ({ type: 'image', src, caption: captions[i] }));
   const slides = video ? [{ type: 'video', ...video }, ...photoSlides] : photoSlides;
 
   const [index, setIndex] = useState(0);
@@ -69,16 +69,22 @@ export default function ImageSlider({ images = [], altPrefix = 'Photo', captions
         <>
           <button className="slider-arrow slider-arrow-left" onClick={() => go(-1)} aria-label="Previous slide">‹</button>
           <button className="slider-arrow slider-arrow-right" onClick={() => go(1)} aria-label="Next slide">›</button>
-          <div className="slider-dots">
-            {slides.map((s, i) => (
-              <button
-                key={i}
-                className={`slider-dot ${i === index ? 'active' : ''} ${s.type === 'video' ? 'slider-dot-video' : ''}`}
-                onClick={() => setIndex(i)}
-                aria-label={s.type === 'video' ? 'Go to video walkthrough' : `Go to photo ${i + 1}`}
-              />
-            ))}
-          </div>
+          {slides.length <= 12 ? (
+            <div className="slider-dots">
+              {slides.map((s, i) => (
+                <button
+                  key={i}
+                  className={`slider-dot ${i === index ? 'active' : ''} ${s.type === 'video' ? 'slider-dot-video' : ''}`}
+                  onClick={() => setIndex(i)}
+                  aria-label={s.type === 'video' ? 'Go to video walkthrough' : `Go to photo ${i + 1}`}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="slider-progress" aria-hidden="true">
+              <div className="slider-progress-fill" style={{ width: `${((index + 1) / slides.length) * 100}%` }} />
+            </div>
+          )}
         </>
       )}
 

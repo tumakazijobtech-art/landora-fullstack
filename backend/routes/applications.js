@@ -46,7 +46,8 @@ router.post(
         type: 'lease',
         status: { $ne: 'withdrawn' },
       });
-      if (activeLeaseApplicants >= MAX_APPLICANTS) {
+      const cap = parcel.maxApplicants || MAX_APPLICANTS;
+      if (activeLeaseApplicants >= cap) {
         return res.status(400).json({ error: 'This parcel has reached its maximum number of applicants for this season' });
       }
     } else {

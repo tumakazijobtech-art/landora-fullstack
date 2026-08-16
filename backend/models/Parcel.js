@@ -141,7 +141,7 @@ const parcelSchema = new mongoose.Schema(
     },
     photos: {
       type: [{ type: String, trim: true }],
-      validate: [(arr) => arr.length <= 6, 'A parcel can have at most 6 photos'],
+      validate: [(arr) => arr.length <= 50, 'A parcel can have at most 50 photos'],
     },
     financingAvailable: { type: Boolean, default: false },
     insured: { type: Boolean, default: false },
@@ -185,6 +185,11 @@ const parcelSchema = new mongoose.Schema(
     // it is not currently marked "available" (for example, before the deadline
     // above has been set for the next season, or right after one has passed).
     preBookingEnabled: { type: Boolean, default: true },
+
+    // How many active lease applicants this listing can collect before it is
+    // considered full for the season. Defaults to the platform wide MAX_APPLICANTS
+    // (see utils/constants.js) but an admin can override it per parcel.
+    maxApplicants: { type: Number, min: 1, max: 500, default: 20 },
   },
   { timestamps: true }
 );
