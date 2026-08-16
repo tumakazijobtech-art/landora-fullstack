@@ -7,6 +7,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { generateReference } = require('../utils/reference');
 const { countyCentroid, distanceKm } = require('../utils/geo');
 const cache = require('../middleware/cache');
+const { MAX_APPLICANTS } = require('../utils/constants');
 
 const router = express.Router();
 
@@ -17,17 +18,25 @@ const DETAIL_TTL_MS = 60 * 1000; // a single parcel page is read far more than i
 // Listings don't get pulled the moment someone applies — accepting is what takes a
 // parcel off the market (see routes/admin.js). Instead the marketplace card and
 // listing page show how many people have applied, to create urgency without ever
-// hiding a parcel that's still actually open. This attaches an `applicantCount` to
-// each parcel in a list.
+// hiding a parcel that's still actually open. This attaches an `applicantCount` and
+// `spotsRemaining` (out of MAX_APPLICANTS) to each parcel in a list.
 async function withApplicantCounts(parcels) {
   const ids = parcels.map((p) => p._id);
   if (ids.length === 0) return parcels;
   const counts = await Application.aggregate([
-    { $match: { parcel: { $in: ids }, status: { $ne: 'withdrawn' } } },
+    { $match: { parcel: { $in: ids }, type: 'lease', status: { $ne: 'withdrawn' } } },
     { $group: { _id: '$parcel', count: { $sum: 1 } } },
   ]);
   const countMap = Object.fromEntries(counts.map((c) => [c._id.toString(), c.count]));
-  return parcels.map((p) => ({ ...p, applicantCount: countMap[p._id.toString()] || 0 }));
+  return parcels.map((p) => {
+    const applicantCount = countMap[p._id.toString()] || 0;
+    return {
+      ...p,
+      applicantCount,
+      maxApplicants: MAX_APPLICANTS,
+      spotsRemaining: Math.max(0, MAX_APPLICANTS - applicantCount),
+    };
+  });
 }
 
 // A listing's leaseDeadline is a planting season cutoff, not a hard delete — once it

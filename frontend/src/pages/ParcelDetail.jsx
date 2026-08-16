@@ -10,6 +10,7 @@ import ShareMenu from '../components/ShareMenu.jsx';
 import ApplyLeaseWizard from '../components/ApplyLeaseWizard.jsx';
 import WaitlistModal from '../components/WaitlistModal.jsx';
 import CountdownTimer, { ApplicantCount } from '../components/UrgencyBadges.jsx';
+import { ShieldIcon } from '../components/Icons.jsx';
 
 const METRIC_LABELS = {
   soilQuality: 'Soil quality',
@@ -135,9 +136,9 @@ export default function ParcelDetail() {
               {parcel.season && <span>{parcel.season}</span>}
               {parcel.location && <span>{parcel.location}</span>}
             </div>
-            {(parcel.applicantCount > 0 || parcel.leaseDeadline) && (
+            {(parcel.status === 'available' || parcel.leaseDeadline) && (
               <div className="urgency-row" style={{ marginTop: 10 }}>
-                <ApplicantCount count={parcel.applicantCount} size="md" />
+                <ApplicantCount count={parcel.applicantCount} maxApplicants={parcel.maxApplicants} size="md" />
                 <CountdownTimer deadline={parcel.leaseDeadline} compact />
               </div>
             )}
@@ -203,7 +204,7 @@ export default function ParcelDetail() {
                 </div>
                 {tv && tv.status === 'verified' && (
                   <div className="verified-strip">
-                    <span className="verified-shield">🛡</span>
+                    <span className="verified-shield"><ShieldIcon size={16} /></span>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 13 }}>Landowner identity and title verified</div>
                       <div style={{ fontSize: 12, color: 'var(--g700)' }}>

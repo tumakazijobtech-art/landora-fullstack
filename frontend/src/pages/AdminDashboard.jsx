@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getBranding, getDefaultBranding, setBranding, resetBranding } from '../branding.js';
+import { ArrowRightIcon, SparkleIcon } from '../components/Icons.jsx';
 
 // Lets an admin point the app icon (browser tab / PWA icon, expects an SVG) and the
 // square app logo (navbar, avatar fallback) at their own hosted images, without a
@@ -80,10 +81,38 @@ function BrandingPanel() {
           </div>
         </div>
 
+        <div className="branding-field">
+          <label htmlFor="chatbot-icon-url">Chatbot launcher icon URL, optional</label>
+          <div className="branding-field-row">
+            <div className="branding-preview branding-preview-chatbot">
+              {values.chatbotIconUrl ? (
+                <img
+                  src={values.chatbotIconUrl}
+                  alt="Chatbot icon preview"
+                  onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
+                  onLoad={(e) => { e.currentTarget.style.visibility = 'visible'; }}
+                />
+              ) : (
+                <SparkleIcon size={18} />
+              )}
+            </div>
+            <input
+              id="chatbot-icon-url"
+              type="url"
+              placeholder="https://example.com/chatbot-icon.png, leave blank for the default icon"
+              value={values.chatbotIconUrl}
+              onChange={(e) => handleChange('chatbotIconUrl', e.target.value)}
+            />
+          </div>
+          <p className="card-sub" style={{ marginTop: 6, marginBottom: 0 }}>
+            Shown on the floating launcher for the Landora assistant on the marketplace page.
+          </p>
+        </div>
+
         <div className="branding-actions">
           <button type="submit" className="btn-primary">Save brand assets</button>
           <button type="button" className="btn-ghost" onClick={handleReset}>Reset to default</button>
-          {saved && <span className="branding-saved">Saved — applied across the app now.</span>}
+          {saved && <span className="branding-saved">Saved, applied across the app now.</span>}
         </div>
       </form>
     </div>
@@ -169,7 +198,7 @@ function ApplicationsPanel({ token }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <ApplicantAvatar person={a.farmer} />
                   <div>
-                    <div style={{ fontWeight: 600 }}>{a.farmer?.name} → {a.parcel?.title}</div>
+                    <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>{a.farmer?.name} <ArrowRightIcon size={12} /> {a.parcel?.title}</div>
                     <div style={{ fontSize: 12, color: 'var(--s500)' }}>
                       {a.farmer?.phone && `${a.farmer.phone} · `}{a.farmer?.email}
                       {a.parcel?.county ? ` · ${a.parcel.county} County` : ''}

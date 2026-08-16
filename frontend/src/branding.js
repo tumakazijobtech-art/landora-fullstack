@@ -10,6 +10,9 @@ const EVENT_NAME = 'landora:branding-change';
 const DEFAULTS = {
   appIconUrl: import.meta.env.VITE_APP_ICON_URL || '/logo.svg',
   appLogoUrl: import.meta.env.VITE_APP_LOGO_URL || import.meta.env.VITE_LOGO_URL || '/logo.svg',
+  // Launcher icon for the AI agent chat widget. Left blank, the widget falls back to
+  // its own built in icon, an admin can override it here with a hosted image.
+  chatbotIconUrl: import.meta.env.VITE_CHATBOT_ICON_URL || '',
 };
 
 function readStored() {
@@ -28,6 +31,9 @@ export function getBranding() {
   return {
     appIconUrl: (stored.appIconUrl || '').trim() || DEFAULTS.appIconUrl,
     appLogoUrl: (stored.appLogoUrl || '').trim() || DEFAULTS.appLogoUrl,
+    // Empty string is a valid, meaningful value here (means "use the built in
+    // launcher icon"), so this one is not forced back to a default when blank.
+    chatbotIconUrl: (stored.chatbotIconUrl ?? DEFAULTS.chatbotIconUrl ?? '').trim(),
   };
 }
 

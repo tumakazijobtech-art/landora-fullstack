@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const Application = require('../models/Application');
 const Parcel = require('../models/Parcel');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { MAX_APPLICANTS } = require('../utils/constants');
 
 const router = express.Router();
 
@@ -39,6 +40,14 @@ router.post(
     if (applicationType === 'lease') {
       if (parcel.status !== 'available') {
         return res.status(400).json({ error: 'This parcel is not currently accepting applications' });
+      }
+      const activeLeaseApplicants = await Application.countDocuments({
+        parcel: parcel._id,
+        type: 'lease',
+        status: { $ne: 'withdrawn' },
+      });
+      if (activeLeaseApplicants >= MAX_APPLICANTS) {
+        return res.status(400).json({ error: 'This parcel has reached its maximum number of applicants for this season' });
       }
     } else {
       // Pre booking is meant to work ahead of a season even before a listing is

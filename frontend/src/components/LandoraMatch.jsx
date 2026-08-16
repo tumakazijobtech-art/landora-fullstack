@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SearchIcon } from './Icons.jsx';
 import { api } from '../api.js';
 import { COUNTIES, WITHIN_OPTIONS } from '../constants.js';
 
@@ -44,7 +45,7 @@ export default function LandoraMatch({ open, onClose, onMatch }) {
     <div className="modal-scrim" onClick={onClose}>
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
-        <div className="match-icon">⌕</div>
+        <div className="match-icon"><SearchIcon size={20} /></div>
         <div className="card-title" style={{ marginBottom: 4 }}>Landora Match</div>
         <div className="card-sub" style={{ maxWidth: 460 }}>
           Set what you need once. Landora's recommender engine scores and ranks every verified

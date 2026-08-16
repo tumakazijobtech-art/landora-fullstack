@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import ScoreBadge from './ScoreBadge.jsx';
 import WishlistButton from './WishlistButton.jsx';
 import CountdownTimer, { ApplicantCount } from './UrgencyBadges.jsx';
+import { CheckIcon } from './Icons.jsx';
 
 function matchTier(score) {
   if (score >= 80) return 'match-high';
@@ -84,14 +85,14 @@ export default function ParcelCard({ parcel }) {
             {hasMatch && parcel.matchReasons && parcel.matchReasons.length > 0 && (
               <div className="match-reasons">
                 {parcel.matchReasons.map((r) => (
-                  <span className="match-reason" key={r}>✓ {r}</span>
+                  <span className="match-reason" key={r}><CheckIcon size={11} /> {r}</span>
                 ))}
               </div>
             )}
 
-            {(parcel.applicantCount > 0 || parcel.leaseDeadline) && (
+            {(parcel.status === 'available' || parcel.leaseDeadline) && (
               <div className="urgency-row">
-                <ApplicantCount count={parcel.applicantCount} />
+                <ApplicantCount count={parcel.applicantCount} maxApplicants={parcel.maxApplicants} />
                 <CountdownTimer deadline={parcel.leaseDeadline} compact />
               </div>
             )}

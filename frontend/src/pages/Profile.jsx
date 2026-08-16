@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { COUNTIES, LOGO_URL } from '../constants.js';
+import { LogoutIcon } from '../components/Icons.jsx';
 
 export default function Profile() {
-  const { user, token, updateUser } = useAuth();
+  const { user, token, updateUser, logout } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     name: user?.name || '',
     county: user?.county || '',
@@ -15,6 +18,11 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
 
   if (!user) return null;
+
+  function handleLogout() {
+    logout();
+    navigate('/');
+  }
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -80,7 +88,7 @@ export default function Profile() {
                   placeholder="https://... (leave blank to use the Landora logo)"
                 />
                 <div style={{ fontSize: 11.5, color: 'var(--s500)', marginTop: 6 }}>
-                  Shown in the navbar, your dashboard, and on your listings. Leave blank for the default Landora mark.
+                  Shown in the navbar, your dashboard and on your listings. Leave blank for the default Landora mark.
                 </div>
               </div>
             </div>
@@ -88,6 +96,16 @@ export default function Profile() {
               {saving ? 'Saving…' : 'Save changes'}
             </button>
           </form>
+        </div>
+
+        <div className="panel profile-logout-panel">
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Sign out of Landora</div>
+            <div style={{ fontSize: 12.5, color: 'var(--s500)' }}>You will need to sign in again to access your dashboard.</div>
+          </div>
+          <button type="button" className="btn-outline-green profile-logout-btn" onClick={handleLogout}>
+            <LogoutIcon size={15} /> Log out
+          </button>
         </div>
       </div>
     </div>

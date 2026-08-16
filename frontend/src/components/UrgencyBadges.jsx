@@ -1,19 +1,27 @@
 import React, { useEffect, useState } from 'react';
 
-// "X people have applied" — shown instead of ever pulling a listing the moment
-// someone applies, so the parcel stays visible (and applicable to) everyone while
-// still creating real urgency.
-export function ApplicantCount({ count, size = 'sm' }) {
-  if (!count) return null;
+// Shows how many bidding spots are left out of the season cap, rather than just a
+// raw applicant count — with nobody applied yet this reads as "20 bidding spots
+// remaining", and counts down from there as farmers apply, without ever pulling
+// the listing itself (see routes/admin.js for what actually takes a parcel down).
+export function ApplicantCount({ count, maxApplicants = 20, size = 'sm' }) {
+  const applied = count || 0;
+  const remaining = Math.max(0, maxApplicants - applied);
+  const full = remaining === 0;
+
   return (
-    <span className={`urgency-applicants urgency-applicants-${size}`}>
+    <span className={`urgency-applicants urgency-applicants-${size} ${full ? 'urgency-applicants-full' : ''}`}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <circle cx="8" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8"/>
         <circle cx="16.5" cy="9" r="2.6" stroke="currentColor" strokeWidth="1.8"/>
         <path d="M2.5 19c.9-3.3 3.4-5 5.5-5s4.6 1.7 5.5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
         <path d="M14.5 14.3c1.9.2 3.7 1.7 4.4 4.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
       </svg>
-      {count} {count === 1 ? 'person has' : 'people have'} applied
+      {full
+        ? 'All bidding spots taken for this season'
+        : applied === 0
+          ? `${maxApplicants} bidding spots remaining`
+          : `${remaining} of ${maxApplicants} bidding spots remaining`}
     </span>
   );
 }
@@ -50,7 +58,12 @@ export default function CountdownTimer({ deadline, compact = false }) {
   if (compact) {
     return (
       <span className={`urgency-timer urgency-timer-compact ${urgent ? 'urgent' : ''}`}>
-        ⏱ {days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}m`} left to apply
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="13" r="8" stroke="currentColor" strokeWidth="1.8"/>
+          <path d="M12 9v4l2.6 2.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M9.5 2.5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+        </svg>
+        {days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}m`} left to apply
       </span>
     );
   }

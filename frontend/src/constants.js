@@ -1,6 +1,14 @@
-// Counties Landora currently lists in — kept in one place since both the marketplace
-// filter bar and Landora Match need the same list.
-export const COUNTIES = ['Nairobi', 'Nakuru', 'Nyeri', 'Uasin Gishu', 'Meru', 'Nyandarua', 'Kiambu', 'Kisumu', 'Mombasa', 'Machakos'];
+// All 47 counties of Kenya, kept in one place since both the marketplace filter bar
+// and Landora Match need the same list.
+export const COUNTIES = [
+  'Mombasa', 'Kwale', 'Kilifi', 'Tana River', 'Lamu', 'Taita Taveta', 'Garissa', 'Wajir',
+  'Mandera', 'Marsabit', 'Isiolo', 'Meru', 'Tharaka Nithi', 'Embu', 'Kitui', 'Machakos',
+  'Makueni', 'Nyandarua', 'Nyeri', 'Kirinyaga', 'Murang\u2019a', 'Kiambu', 'Turkana',
+  'West Pokot', 'Samburu', 'Trans Nzoia', 'Uasin Gishu', 'Elgeyo Marakwet', 'Nandi',
+  'Baringo', 'Laikipia', 'Nakuru', 'Narok', 'Kajiado', 'Kericho', 'Bomet', 'Kakamega',
+  'Vihiga', 'Bungoma', 'Busia', 'Siaya', 'Kisumu', 'Homa Bay', 'Migori', 'Kisii',
+  'Nyamira', 'Nairobi',
+];
 
 export const WITHIN_OPTIONS = [
   { label: '5km', value: '5' },

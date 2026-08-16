@@ -4,6 +4,7 @@ import ParcelCard from '../components/ParcelCard.jsx';
 import LandoraMatch from '../components/LandoraMatch.jsx';
 import WaitlistModal from '../components/WaitlistModal.jsx';
 import AIAgentWidget from '../components/AIAgentWidget.jsx';
+import { SearchIcon } from '../components/Icons.jsx';
 import { COUNTIES } from '../constants.js';
 
 const DEFAULT_FILTERS = {
@@ -105,12 +106,12 @@ export default function Marketplace() {
 
         {!isMatchMode && (
           <div className="match-banner">
-            <div className="match-banner-icon">⌕</div>
+            <div className="match-banner-icon"><SearchIcon size={18} /></div>
             <div className="match-banner-text">
               <div className="match-banner-title">Not sure which parcel fits, or would rather not browse manually?</div>
               <div className="match-banner-sub">Set your requirements once and let Landora's recommender engine rank every verified parcel for you.</div>
             </div>
-            <button className="btn-match" onClick={() => setMatchOpen(true)}>⌕ Use Landora Match</button>
+            <button className="btn-match" onClick={() => setMatchOpen(true)}><SearchIcon size={14} /> Use Landora Match</button>
           </div>
         )}
 

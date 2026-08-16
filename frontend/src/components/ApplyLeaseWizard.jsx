@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { CheckIcon } from './Icons.jsx';
 
 const STEPS_LEASE = ['Your details', 'Farm plan', 'Review and send'];
 const STEPS_PREBOOKING = ['Your details', 'Season plan', 'Review and send'];
@@ -110,7 +111,7 @@ function WizardBody({ steps, step, form, update, error, submitting, type, next, 
       <div className="apply-wizard-steps">
         {steps.map((label, i) => (
           <div key={label} className={`apply-wizard-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
-            <span className="apply-wizard-step-dot">{i < step ? '✓' : i + 1}</span>
+            <span className="apply-wizard-step-dot">{i < step ? <CheckIcon size={11} /> : i + 1}</span>
             <span className="apply-wizard-step-label">{label}</span>
           </div>
         ))}

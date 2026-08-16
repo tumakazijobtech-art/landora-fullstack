@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../api.js';
 import { COUNTIES } from '../constants.js';
+import { EnvelopeIcon } from './Icons.jsx';
 
 const EMPTY = { name: '', email: '', phone: '', county: '', cropInterest: '', message: '' };
 
@@ -50,7 +51,7 @@ export default function WaitlistModal({ open, onClose, parcelId, parcelTitle }) 
     <div className="modal-scrim" onClick={handleClose}>
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={handleClose} aria-label="Close">×</button>
-        <div className="match-icon">☰</div>
+        <div className="match-icon"><EnvelopeIcon size={20} /></div>
         <div className="card-title" style={{ marginBottom: 4 }}>
           {parcelId ? `Pre book ${parcelTitle || 'this parcel'}` : 'Join the Landora waitlist'}
         </div>
