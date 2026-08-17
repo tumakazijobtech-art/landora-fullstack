@@ -4,6 +4,8 @@ const Parcel = require('../models/Parcel');
 const Application = require('../models/Application');
 const AuthSettings = require('../models/AuthSettings');
 const WaitlistEntry = require('../models/WaitlistEntry');
+const FeeSettings = require('../models/FeeSettings');
+const Payment = require('../models/Payment');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const cache = require('../middleware/cache');
 
@@ -285,5 +287,79 @@ router.patch('/waitlist/:id', [body('status').isIn(['new', 'contacted', 'convert
   await entry.save();
   res.json({ entry });
 });
+
+// Admin: every fee the platform charges, plus the M-Pesa till/shortcode payments are
+// collected against. This is the single source of truth PATCH /api/payments/initiate
+// reads from — editing a number here changes what the next STK push charges, with no
+// redeploy needed.
+router.get('/fee-settings', async (req, res) => {
+  const fees = await FeeSettings.getSingleton();
+  res.json({ fees });
+});
+
+router.patch(
+  '/fee-settings',
+  [
+    body('commission.percent').optional().isFloat({ min: 0, max: 100 }),
+    body('commission.minKes').optional().isFloat({ min: 0 }),
+    body('commission.maxKes').optional().isFloat({ min: 0 }),
+    body('verification.basicKes').optional().isFloat({ min: 0 }),
+    body('verification.premiumKes').optional().isFloat({ min: 0 }),
+    body('leaseContract.basicKes').optional().isFloat({ min: 0 }),
+    body('leaseContract.professionalKes').optional().isFloat({ min: 0 }),
+    body('landownerSubscription.individualKes').optional().isFloat({ min: 0 }),
+    body('landownerSubscription.multiPropertyKes').optional().isFloat({ min: 0 }),
+    body('landownerSubscription.institutionalKes').optional().isFloat({ min: 0 }),
+    body('farmerPremium.monthlyKes').optional().isFloat({ min: 0 }),
+    body('mpesa.tillNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('mpesa.shortcode').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('mpesa.accountReferencePrefix').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    const fees = await FeeSettings.getSingleton();
+    const groups = ['commission', 'verification', 'leaseContract', 'landownerSubscription', 'farmerPremium', 'mpesa'];
+    groups.forEach((group) => {
+      if (req.body[group] && typeof req.body[group] === 'object') {
+        fees[group] = { ...(fees[group] ? fees[group].toObject() : {}), ...req.body[group] };
+      }
+    });
+    await fees.save();
+    res.json({ fees });
+  }
+);
+
+// Admin: every M-Pesa payment across every fee type, most recent first.
+router.get(
+  '/payments',
+  [
+    query('type').optional().isIn(['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium']),
+    query('status').optional().isIn(['pending', 'success', 'failed', 'cancelled']),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Invalid filter parameters' });
+
+    const filter = {};
+    if (req.query.type) filter.type = req.query.type;
+    if (req.query.status) filter.status = req.query.status;
+
+    const payments = await Payment.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .populate('user', 'name email phone role')
+      .populate('parcel', 'title county')
+      .lean();
+
+    const totals = await Payment.aggregate([
+      { $match: { status: 'success' } },
+      { $group: { _id: '$type', total: { $sum: '$amount' }, count: { $sum: 1 } } },
+    ]);
+
+    res.json({ payments, totals });
+  }
+);
 
 module.exports = router;

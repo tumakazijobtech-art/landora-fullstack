@@ -3,14 +3,19 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { LOGO_URL } from '../constants.js';
+import PaymentModal from '../components/PaymentModal.jsx';
 
 export default function LandownerDashboard() {
   const { token, user } = useAuth();
   const [parcels, setParcels] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [activeParcel, setActiveParcel] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  // Which paid action is currently open in the payment modal, e.g.
+  // { type: 'verification', tier: 'basic', parcelId } or { type: 'lease_contract', tier: 'professional', applicationId }.
+  const [payAction, setPayAction] = useState(null);
 
   function loadParcels() {
     return api.myParcels(token).then((data) => setParcels(data.parcels));
@@ -20,13 +25,21 @@ export default function LandownerDashboard() {
     return api.receivedApplications(token, parcelId).then((data) => setApplications(data.applications));
   }
 
+  function loadPayments() {
+    return api.myPayments(token).then((data) => setPayments(data.payments));
+  }
+
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadParcels(), loadApplications()])
+    Promise.all([loadParcels(), loadApplications(), loadPayments()])
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function hasSuccessfulPayment(type, matchField, id) {
+    return payments.some((p) => p.type === type && p.status === 'success' && p[matchField]?._id === id);
+  }
 
   async function handleFilterByParcel(id) {
     setActiveParcel(id);
@@ -66,18 +79,36 @@ export default function LandownerDashboard() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Parcel</th><th>County</th><th>Size</th><th>Price / ac / season</th><th>Status</th><th>Applications</th>
+                  <th>Parcel</th><th>County</th><th>Size</th><th>Price / ac / season</th><th>Status</th><th>Applications</th><th>Verification</th>
                 </tr>
               </thead>
               <tbody>
                 {parcels.map((p) => (
-                  <tr key={p._id} style={{ cursor: 'pointer' }} onClick={() => handleFilterByParcel(p._id)}>
-                    <td>{p.title}</td>
+                  <tr key={p._id}>
+                    <td style={{ cursor: 'pointer' }} onClick={() => handleFilterByParcel(p._id)}>{p.title}</td>
                     <td>{p.county}</td>
                     <td>{p.sizeAcres} ac</td>
                     <td>KES {Number(p.pricePerAcrePerSeason).toLocaleString()}</td>
                     <td><span className={`status-pill status-${p.status}`}>{p.status.replace('_', ' ')}</span></td>
                     <td>{p.applicationCount}</td>
+                    <td>
+                      {p.titleVerification?.status === 'verified' ? (
+                        <span className="status-pill status-accepted">Verified</span>
+                      ) : hasSuccessfulPayment('verification', 'parcel', p._id) ? (
+                        <span className="status-pill status-pending">Verification in progress</span>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <button type="button" className="btn-outline-green" style={{ padding: '4px 10px', fontSize: 12 }}
+                            onClick={() => setPayAction({ type: 'verification', tier: 'basic', parcelId: p._id, parcelTitle: p.title })}>
+                            Basic
+                          </button>
+                          <button type="button" className="btn-outline-green" style={{ padding: '4px 10px', fontSize: 12 }}
+                            onClick={() => setPayAction({ type: 'verification', tier: 'premium', parcelId: p._id, parcelTitle: p.title })}>
+                            Premium
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -128,11 +159,51 @@ export default function LandownerDashboard() {
                 {a.landownerNote && (
                   <div style={{ fontSize: 13, marginTop: 8, color: 'var(--s700)' }}>Landora team note: {a.landownerNote}</div>
                 )}
+                {a.status === 'accepted' && (
+                  hasSuccessfulPayment('lease_contract', 'application', a._id) ? (
+                    <div className="info-box" style={{ marginTop: 12, marginBottom: 0 }}>
+                      Digital lease contract generated for this lease.
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button type="button" className="btn-outline-green"
+                        onClick={() => setPayAction({ type: 'lease_contract', tier: 'basic', applicationId: a._id, parcelTitle: a.parcel?.title })}>
+                        Generate basic lease contract
+                      </button>
+                      <button type="button" className="btn-outline-green"
+                        onClick={() => setPayAction({ type: 'lease_contract', tier: 'professional', applicationId: a._id, parcelTitle: a.parcel?.title })}>
+                        Generate professional lease package
+                      </button>
+                    </div>
+                  )
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <PaymentModal
+        open={!!payAction}
+        onClose={() => setPayAction(null)}
+        type={payAction?.type}
+        tier={payAction?.tier}
+        applicationId={payAction?.applicationId}
+        parcelId={payAction?.parcelId}
+        title={
+          payAction?.type === 'verification'
+            ? `${payAction?.tier === 'premium' ? 'Premium' : 'Basic'} land verification`
+            : 'Digital lease contract'
+        }
+        description={
+          payAction?.type === 'verification'
+            ? `Have Landora verify ${payAction?.parcelTitle || 'this listing'} — ownership, boundaries, and risk flags. The amount is shown once the M-Pesa prompt is sent.`
+            : `Generate a standardized digital lease agreement for ${payAction?.parcelTitle || 'this lease'}. The amount is shown once the M-Pesa prompt is sent.`
+        }
+        onSuccess={() => {
+          loadPayments().catch((err) => setError(err.message));
+        }}
+      />
     </div>
   );
 }

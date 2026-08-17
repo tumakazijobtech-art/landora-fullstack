@@ -345,6 +345,231 @@ function WaitlistPanel({ token }) {
   );
 }
 
+// Admin: every fee the platform charges is editable here — nothing is hardcoded.
+// Saving a field immediately changes what the next M-Pesa STK push charges (see
+// backend/routes/payments.js -> resolveAmount), no redeploy required.
+function FeeSettingsPanel({ token }) {
+  const [fees, setFees] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api.adminFeeSettings(token)
+      .then((data) => setFees(data.fees))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function update(group, field, value) {
+    setFees((f) => ({ ...f, [group]: { ...f[group], [field]: value } }));
+    setSaved(false);
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      const data = await api.updateAdminFeeSettings(fees, token);
+      setFees(data.fees);
+      setSaved(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="empty-state">Loading…</div>;
+  if (!fees) return null;
+
+  const numberField = (group, field, label, hint) => (
+    <div className="fee-settings-field" key={`${group}.${field}`}>
+      <label htmlFor={`${group}-${field}`}>{label}</label>
+      <input
+        id={`${group}-${field}`}
+        type="number"
+        min="0"
+        step="1"
+        value={fees[group][field]}
+        onChange={(e) => update(group, field, e.target.value === '' ? '' : Number(e.target.value))}
+      />
+      {hint && <span style={{ fontSize: 11, color: 'var(--s400)' }}>{hint}</span>}
+    </div>
+  );
+
+  const textField = (group, field, label, placeholder) => (
+    <div className="fee-settings-field" key={`${group}.${field}`}>
+      <label htmlFor={`${group}-${field}`}>{label}</label>
+      <input
+        id={`${group}-${field}`}
+        type="text"
+        placeholder={placeholder}
+        value={fees[group][field] || ''}
+        onChange={(e) => update(group, field, e.target.value)}
+      />
+    </div>
+  );
+
+  return (
+    <form className="panel admin-security-panel" onSubmit={handleSave}>
+      <div>
+        <div className="section-eyebrow">Business model</div>
+        <h3 className="admin-panel-title">Fee settings</h3>
+        <p className="card-sub">
+          Every fee charged through M-Pesa across the platform. Changes apply to the next payment immediately.
+        </p>
+      </div>
+
+      {error && <div className="error-box">{error}</div>}
+
+      <div className="fee-settings-group-title">Transaction commission (charged to the farmer on lease acceptance)</div>
+      <div className="fee-settings-grid">
+        {numberField('commission', 'percent', 'Commission %', '% of first year lease value')}
+        {numberField('commission', 'minKes', 'Minimum (KES)')}
+        {numberField('commission', 'maxKes', 'Maximum (KES)')}
+      </div>
+
+      <div className="fee-settings-group-title">Land verification (paid by the landowner)</div>
+      <div className="fee-settings-grid">
+        {numberField('verification', 'basicKes', 'Basic (KES)')}
+        {numberField('verification', 'premiumKes', 'Premium due-diligence (KES)')}
+      </div>
+
+      <div className="fee-settings-group-title">Digital lease contracts</div>
+      <div className="fee-settings-grid">
+        {numberField('leaseContract', 'basicKes', 'Basic lease (KES)')}
+        {numberField('leaseContract', 'professionalKes', 'Professional package (KES)')}
+      </div>
+
+      <div className="fee-settings-group-title">Landowner subscription (monthly)</div>
+      <div className="fee-settings-grid">
+        {numberField('landownerSubscription', 'individualKes', 'Individual landowner (KES)')}
+        {numberField('landownerSubscription', 'multiPropertyKes', 'Multiple properties (KES)')}
+        {numberField('landownerSubscription', 'institutionalKes', 'Institutions / large landowners (KES)')}
+      </div>
+
+      <div className="fee-settings-group-title">Farmer / tenant subscription (monthly)</div>
+      <div className="fee-settings-grid">
+        {numberField('farmerPremium', 'monthlyKes', 'Premium access (KES)')}
+      </div>
+
+      <div className="fee-settings-group-title">M-Pesa collection (Buy Goods / Till)</div>
+      <div className="fee-settings-grid">
+        {textField('mpesa', 'tillNumber', 'Till number (PartyB)', 'e.g. 174379')}
+        {textField('mpesa', 'shortcode', 'Business shortcode', 'usually same as till number')}
+        {textField('mpesa', 'accountReferencePrefix', 'Account reference prefix', 'LANDORA')}
+      </div>
+      <p className="card-sub" style={{ marginTop: 4 }}>
+        Consumer key/secret and passkey are set as server environment variables, not here — see backend/.env.example.
+      </p>
+
+      <div className="branding-actions" style={{ marginTop: 20 }}>
+        <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save fee settings'}</button>
+        {saved && <span className="branding-saved">Saved.</span>}
+      </div>
+    </form>
+  );
+}
+
+// Admin: the full M-Pesa payment ledger across every fee type, plus running totals
+// of successfully collected revenue per stream.
+function PaymentsPanel({ token }) {
+  const [payments, setPayments] = useState([]);
+  const [totals, setTotals] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  function load(status) {
+    setLoading(true);
+    return api.adminPayments(token, status ? { status } : {})
+      .then((data) => {
+        setPayments(data.payments);
+        setTotals(data.totals || []);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    load(statusFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  const typeLabel = {
+    commission: 'Commission',
+    verification: 'Verification',
+    lease_contract: 'Lease contract',
+    landowner_subscription: 'Landowner subscription',
+    farmer_premium: 'Farmer premium',
+  };
+
+  return (
+    <div>
+      {totals.length > 0 && (
+        <div className="fee-settings-grid" style={{ marginBottom: 20 }}>
+          {totals.map((t) => (
+            <div className="panel" key={t._id} style={{ padding: 14 }}>
+              <div style={{ fontSize: 12, color: 'var(--s500)' }}>{typeLabel[t._id] || t._id}</div>
+              <div className="payment-amount" style={{ fontSize: 20 }}>KES {Number(t.total).toLocaleString()}</div>
+              <div style={{ fontSize: 11, color: 'var(--s400)' }}>{t.count} payment{t.count === 1 ? '' : 's'}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="filter-bar">
+        <span className={`filter-badge ${statusFilter === '' ? 'active' : ''}`} onClick={() => setStatusFilter('')}>All</span>
+        <span className={`filter-badge ${statusFilter === 'success' ? 'active' : ''}`} onClick={() => setStatusFilter('success')}>Success</span>
+        <span className={`filter-badge ${statusFilter === 'pending' ? 'active' : ''}`} onClick={() => setStatusFilter('pending')}>Pending</span>
+        <span className={`filter-badge ${statusFilter === 'failed' ? 'active' : ''}`} onClick={() => setStatusFilter('failed')}>Failed</span>
+        <span className={`filter-badge ${statusFilter === 'cancelled' ? 'active' : ''}`} onClick={() => setStatusFilter('cancelled')}>Cancelled</span>
+      </div>
+
+      {error && <div className="error-box">{error}</div>}
+      {loading ? (
+        <div className="empty-state">Loading…</div>
+      ) : payments.length === 0 ? (
+        <div className="empty-state">No payments match this filter.</div>
+      ) : (
+        <div className="panel" style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>User</th><th>Type</th><th>Amount</th><th>Phone</th><th>Status</th><th>M-Pesa receipt</th><th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.map((p) => (
+                <tr key={p._id}>
+                  <td>
+                    <div>{p.user?.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--s400)' }}>{p.user?.role}</div>
+                  </td>
+                  <td>{typeLabel[p.type] || p.type}{p.tier ? ` (${p.tier})` : ''}</td>
+                  <td className="payment-amount">KES {Number(p.amount).toLocaleString()}</td>
+                  <td>{p.phone}</td>
+                  <td>
+                    <span className={`status-pill ${p.status === 'success' ? 'status-accepted' : p.status === 'failed' || p.status === 'cancelled' ? 'status-declined' : 'status-pending'}`}>
+                      {p.status}
+                    </span>
+                  </td>
+                  <td>{p.mpesaReceiptNumber || 'N/A'}</td>
+                  <td style={{ fontSize: 12, color: 'var(--s500)' }}>{new Date(p.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { token } = useAuth();
   const [tab, setTab] = useState('listings');
@@ -393,7 +618,15 @@ export default function AdminDashboard() {
           <div>
             <div className="section-eyebrow">Admin</div>
             <h2 className="section-h2" style={{ marginBottom: 0 }}>
-              {tab === 'listings' ? 'All listings' : tab === 'applications' ? 'Applicant qualification' : tab === 'waitlist' ? 'Waitlist and pre bookings' : 'Branding'}
+              {tab === 'listings'
+                ? 'All listings'
+                : tab === 'applications'
+                ? 'Applicant qualification'
+                : tab === 'waitlist'
+                ? 'Waitlist and pre bookings'
+                : tab === 'fees'
+                ? 'Fees & payments'
+                : 'Branding'}
             </h2>
           </div>
           <Link className="btn-outline-green" to="/admin/land-uses">Manage land uses</Link>
@@ -409,6 +642,9 @@ export default function AdminDashboard() {
           <button type="button" className={`admin-tab ${tab === 'waitlist' ? 'active' : ''}`} onClick={() => setTab('waitlist')}>
             Waitlist
           </button>
+          <button type="button" className={`admin-tab ${tab === 'fees' ? 'active' : ''}`} onClick={() => setTab('fees')}>
+            Fees &amp; payments
+          </button>
           <button type="button" className={`admin-tab ${tab === 'branding' ? 'active' : ''}`} onClick={() => setTab('branding')}>
             Branding
           </button>
@@ -420,6 +656,14 @@ export default function AdminDashboard() {
           <ApplicationsPanel token={token} />
         ) : tab === 'waitlist' ? (
           <WaitlistPanel token={token} />
+        ) : tab === 'fees' ? (
+          <>
+            <FeeSettingsPanel token={token} />
+            <div style={{ marginTop: 28 }}>
+              <h3 className="admin-panel-title" style={{ marginBottom: 12 }}>Payment ledger</h3>
+              <PaymentsPanel token={token} />
+            </div>
+          </>
         ) : tab === 'branding' ? (
           <BrandingPanel />
         ) : (

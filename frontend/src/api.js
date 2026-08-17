@@ -167,4 +167,22 @@ export const api = {
     ).toString();
     return request(`/parcels/pricing-suggestion${qs ? `?${qs}` : ''}`);
   },
+
+  // M-Pesa payments — commission, verification, digital lease contracts, and
+  // subscriptions. The amount is always computed server-side from the admin's fee
+  // settings; the client never sends one. See backend/routes/payments.js.
+  initiatePayment: (payload, token) => request('/payments/initiate', { method: 'POST', body: payload, token }),
+  getPaymentStatus: (id, token) => request(`/payments/${id}/status`, { token }),
+  myPayments: (token) => request('/payments/mine', { token }),
+
+  // Admin: platform-wide fee configuration (commission %, verification/lease-contract
+  // prices, subscription tiers, and the M-Pesa till/shortcode) and the full payment
+  // ledger.
+  adminFeeSettings: (token) => request('/admin/fee-settings', { token }),
+  updateAdminFeeSettings: (payload, token) =>
+    request('/admin/fee-settings', { method: 'PATCH', body: payload, token }),
+  adminPayments: (token, params = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return request(`/admin/payments${qs ? `?${qs}` : ''}`, { token });
+  },
 };

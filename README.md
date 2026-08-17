@@ -31,6 +31,12 @@ every listing and application you see comes from an account created through the 
   sign-in.
 - **A guided land tour homepage** — centered hero, mapped-parcel visuals, and a short inspection
   journey using the supplied project imagery.
+- **M-Pesa payments across the business model** — transaction commission (charged to the
+  farmer when a lease is accepted), land verification, digital lease contracts, and
+  landowner/farmer subscriptions, all collected via an M-Pesa "Buy Goods" STK push
+  (`TransactionType: CustomerBuyGoodsOnline`). Every fee is editable from
+  `/admin` → **Fees & payments** — nothing is hardcoded, so a price change takes effect
+  on the very next payment with no redeploy. See "Payments (M-Pesa)" below.
 
 This does **not** yet include the other role dashboards from the original design
 (investor, insurer, agronomist, agrovet, transporter), live chat, insurance payout
@@ -107,6 +113,51 @@ every listing, edit any of them, add the verified key facts / productivity repor
 - All write endpoints validate input server-side (`express-validator`) and check
   ownership before allowing edits — a landowner can only manage their own parcels, a
   farmer can only withdraw their own applications.
+
+## Payments (M-Pesa)
+
+Every fee in the commercialization model — transaction commission, land verification,
+digital lease contracts, and subscriptions — is collected through an M-Pesa "Lipa na
+M-Pesa" STK push against a Buy Goods till (`TransactionType: CustomerBuyGoodsOnline`,
+`PartyB` = your till number). Nothing about the flow is a stub: `POST
+/api/payments/initiate` always computes the amount server-side from the live fee
+settings, sends the real Daraja STK push, and `POST /api/payments/mpesa/callback`
+receives Safaricom's result and updates the payment record.
+
+**Where the money is charged, in the app:**
+
+- Farmer dashboard → once a lease application is **accepted**, "Pay lease commission
+  via M-Pesa" (§1 of the model — a % of the first year's lease value, floor/ceiling
+  applied).
+- Landowner dashboard → per listing, "Basic"/"Premium" **verification**, and per
+  accepted application, "Generate basic/professional **lease contract**".
+- Admin dashboard → `/admin` → **Fees & payments** tab: edit every fee (commission %,
+  min/max, verification prices, lease contract prices, landowner subscription tiers,
+  farmer premium price) and the M-Pesa till number/shortcode, plus a full payment
+  ledger with revenue totals per stream. Landowner and farmer subscriptions are billed
+  through the same `/api/payments/initiate` endpoint (`type: landowner_subscription` /
+  `farmer_premium`) — the fee fields are live, wire up a "Subscribe" button wherever you
+  want to sell that plan next.
+
+**Setting it up:**
+
+1. Get a Daraja app at https://developer.safaricom.co.ke (sandbox is free and good
+   enough to test the whole flow, including a real STK push to a Safaricom test number).
+2. In `backend/.env`, set `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, `MPESA_PASSKEY`,
+   and `MPESA_CALLBACK_URL` (must be a public https URL Safaricom can reach — use ngrok
+   or similar for local dev, since Safaricom cannot call `localhost`).
+3. Log in as an admin, go to **Fees & payments**, and set the **till number** (used as
+   `PartyB`) and **business shortcode** (used to build the STK password — usually the
+   same value as the till number for a Buy Goods till). These are business
+   configuration, not secrets, so they're edited from the dashboard rather than `.env`.
+4. Set your fee amounts on the same tab. They apply immediately.
+5. Test end to end: accept a lease application, then from the farmer's dashboard pay
+   the commission — you should get a real STK prompt on the phone number you enter.
+
+If the callback URL is unreachable (e.g. you forgot to set it, or you're testing
+without a tunnel), the frontend's payment modal still resolves the outcome — `GET
+/api/payments/:id/status` falls back to polling Safaricom's STK query endpoint
+directly, so a payment doesn't get stuck showing "waiting" forever.
 
 ## Verification delivery
 

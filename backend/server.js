@@ -21,6 +21,7 @@ const landUseRoutes = require('./routes/landUses');
 const adminRoutes = require('./routes/admin');
 const wishlistRoutes = require('./routes/wishlist');
 const waitlistRoutes = require('./routes/waitlist');
+const paymentRoutes = require('./routes/payments');
 
 const app = express();
 
@@ -75,6 +76,9 @@ app.use('/api/land-uses', landUseRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+// M-Pesa STK push init/status live under /api/payments; the callback sub-route
+// (/api/payments/mpesa/callback) is intentionally left open — see routes/payments.js.
+app.use('/api/payments', paymentRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 

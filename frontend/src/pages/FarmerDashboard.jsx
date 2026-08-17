@@ -2,15 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import PaymentModal from '../components/PaymentModal.jsx';
 
 export default function FarmerDashboard() {
   const { token } = useAuth();
   const [applications, setApplications] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [payFor, setPayFor] = useState(null); // application being paid for, or null
 
   function load() {
-    return api.myApplications(token).then((data) => setApplications(data.applications));
+    return Promise.all([api.myApplications(token), api.myPayments(token)]).then(([appData, payData]) => {
+      setApplications(appData.applications);
+      setPayments(payData.payments);
+    });
   }
 
   useEffect(() => {
@@ -20,6 +26,13 @@ export default function FarmerDashboard() {
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A lease is only actually secured once the commission has been paid — this looks
+  // across the farmer's own payment history for a successful "commission" payment
+  // tied to this application.
+  function commissionPaid(applicationId) {
+    return payments.some((p) => p.type === 'commission' && p.status === 'success' && p.application?._id === applicationId);
+  }
 
   if (loading) return <div className="section"><div className="section-inner">Loading…</div></div>;
 
@@ -58,11 +71,39 @@ export default function FarmerDashboard() {
                     To withdraw this application, please contact the Landora team — withdrawals require admin approval.
                   </div>
                 )}
+                {a.status === 'accepted' && (
+                  commissionPaid(a._id) ? (
+                    <div className="info-box" style={{ marginTop: 12, marginBottom: 0 }}>
+                      Lease commission paid — this lease is secured.
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <button type="button" className="btn-primary" onClick={() => setPayFor(a)}>
+                        Pay lease commission via M-Pesa
+                      </button>
+                      <span style={{ fontSize: 12, color: 'var(--s500)' }}>
+                        A one-time platform fee, charged on the first year's lease value.
+                      </span>
+                    </div>
+                  )
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <PaymentModal
+        open={!!payFor}
+        onClose={() => setPayFor(null)}
+        type="commission"
+        applicationId={payFor?._id}
+        title="Pay lease commission"
+        description={`Secures your lease on ${payFor?.parcel?.title || 'this parcel'}. The exact amount is calculated from the lease value and shown once the M-Pesa prompt is sent.`}
+        onSuccess={() => {
+          load().catch((err) => setError(err.message));
+        }}
+      />
     </div>
   );
 }
