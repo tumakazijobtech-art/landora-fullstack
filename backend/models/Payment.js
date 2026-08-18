@@ -13,7 +13,7 @@ const paymentSchema = new mongoose.Schema(
     // amount is computed.
     type: {
       type: String,
-      enum: ['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report'],
+      enum: ['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report'],
       required: true,
       index: true,
     },

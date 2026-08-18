@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { LOGO_URL } from '../constants.js';
 import PaymentModal from '../components/PaymentModal.jsx';
+import ReferralPanel from '../components/ReferralPanel.jsx';
 
 export default function LandownerDashboard() {
   const { token, user } = useAuth();
@@ -112,6 +113,8 @@ export default function LandownerDashboard() {
           )}
         </div>
 
+        <ReferralPanel />
+
         {parcels.length === 0 ? (
           <div className="empty-state">
             You haven't listed any land yet. <Link to="/parcels/new">Create your first listing</Link>.
@@ -195,6 +198,11 @@ export default function LandownerDashboard() {
                   </div>
                   <span className={`status-pill status-${a.status}`}>{a.status}</span>
                 </div>
+                {a.commitmentFeePaid && (
+                  <div style={{ fontSize: 11, marginTop: 8 }}>
+                    <span className="status-pill status-accepted">Commitment fee paid</span>
+                  </div>
+                )}
                 {a.intendedCrop && <div style={{ fontSize: 13, marginTop: 8 }}>Intended crop: {a.intendedCrop}</div>}
                 {a.seasonsRequested && <div style={{ fontSize: 13 }}>Seasons requested: {a.seasonsRequested}</div>}
                 {a.message && <div style={{ fontSize: 13, marginTop: 8, color: 'var(--s700)' }}>"{a.message}"</div>}

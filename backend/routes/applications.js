@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Application = require('../models/Application');
 const Parcel = require('../models/Parcel');
+const Payment = require('../models/Payment');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { MAX_APPLICANTS } = require('../utils/constants');
 
@@ -111,7 +112,21 @@ router.get('/received', requireAuth, requireRole('landowner'), async (req, res) 
     .populate('parcel', 'title county location')
     .populate('farmer', 'name phone email county profilePicture')
     .lean();
-  res.json({ applications });
+
+  // The commitment fee is paid by the farmer, so it never shows up in the
+  // landowner's own payment history — surfaced here instead as a computed flag per
+  // application, purely informational (does not gate or change anything else).
+  const paidApplicationIds = new Set(
+    (
+      await Payment.find({ type: 'commitment', status: 'success', application: { $in: applications.map((a) => a._id) } })
+        .select('application')
+        .lean()
+    ).map((p) => String(p.application))
+  );
+
+  res.json({
+    applications: applications.map((a) => ({ ...a, commitmentFeePaid: paidApplicationIds.has(String(a._id)) })),
+  });
 });
 
 module.exports = router;

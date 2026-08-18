@@ -15,6 +15,16 @@ const feeSettingsSchema = new mongoose.Schema(
   {
     key: { type: String, unique: true, default: 'fees' },
 
+    // --- Buyer commitment fee — a small flat fee a farmer pays right after applying
+    // for a lease, before the landowner has decided anything. Signals serious intent
+    // and lets landowners see which applicants have actually put money behind their
+    // interest (see the "Commitment fee paid" badge on the landowner dashboard).
+    // Distinct from §1 commission below, which is only charged once a lease is
+    // accepted.
+    commitment: {
+      feeKes: { type: Number, min: 0, default: 300 },
+    },
+
     // --- §1 Transaction commission — charged to the farmer when a lease application
     // is accepted, as a percentage of the first year's lease value (pricePerAcrePerSeason
     // x sizeAcres), bounded by a floor/ceiling so very small or very large leases stay

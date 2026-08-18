@@ -46,6 +46,15 @@ every listing and application you see comes from an account created through the 
   insurance rates, and a suggested price band. Sold as a one-off, time-limited M-Pesa
   purchase to anyone logged in — farmer, landowner, or (once you add the account type)
   an institutional buyer. See "Land price intelligence" below.
+- **Buyer commitment fee** — a small flat M-Pesa fee a farmer can pay right after
+  applying for a lease, before the landowner has decided anything. Landowners see a
+  "Commitment fee paid" badge on applicants who've paid it. Editable at Admin → Fees
+  & Payments, same as every other fee.
+- **Financing & insurance referrals (§8/§9)** — an admin-managed list of financing
+  and insurance partners; farmers and landowners can request an introduction from
+  either dashboard, and admins track the request through to a manually-recorded
+  commission once the partner actually pays. See "Financing & insurance referrals"
+  below.
 
 This does **not** yet include the other role dashboards from the original design
 (investor, insurer, agronomist, agrovet, transporter), live chat, insurance payout
@@ -135,9 +144,11 @@ receives Safaricom's result and updates the payment record.
 
 **Where the money is charged, in the app:**
 
-- Farmer dashboard → once a lease application is **accepted**, "Pay lease commission
-  via M-Pesa" (§1 of the model — a % of the first year's lease value, floor/ceiling
-  applied).
+- Farmer dashboard → right after applying (while the application is still
+  **pending**), "Pay commitment fee via M-Pesa" — a small flat fee that signals
+  serious intent; the landowner sees a "Commitment fee paid" badge on that applicant.
+  Once a lease application is **accepted**, "Pay lease commission via M-Pesa" (§1 of
+  the model — a % of the first year's lease value, floor/ceiling applied).
 - Landowner dashboard → per listing, "Basic"/"Premium" **verification**, and per
   accepted application, "Generate basic/professional **lease contract**".
 - Admin dashboard → `/admin` → **Fees & payments** tab: edit every fee (commission %,
@@ -230,6 +241,31 @@ is a one-off snapshot rather than a recurring plan.
 even when the caller hasn't paid, so the teaser and the "buy report" prompt can share
 one endpoint — check the `unlocked` field to know whether the rest of the payload
 (trend/demand/rates/band) is present.
+
+## Financing & insurance referrals
+
+`/api/referrals` (§8/§9 of the business model) is deliberately not another M-Pesa fee
+— the money direction is reversed. Landora doesn't lend, underwrite, or move a
+farmer's money here; it introduces them to a `ReferralPartner` (an admin-managed
+financing or insurance provider — `Admin → Referrals`) and tracks the introduction as
+a `ReferralRequest`. There's no partner API integration in this pass, so the whole
+lifecycle is admin-driven:
+
+1. A farmer or landowner requests an introduction from their dashboard's
+   "Financing & insurance" panel, optionally with a note.
+2. An admin reviews it under `Admin → Referrals`, moving its status forward
+   (`submitted → contacted → approved/declined → disbursed`) as the partner reports
+   back off-platform (email, phone, however that relationship actually works).
+3. If the partner pays Landora a commission for the referral converting, the admin
+   enters that amount when marking it `disbursed` — the endpoint refuses to set that
+   status without a commission figure, so the revenue total on the Referrals tab can't
+   silently under-count. That figure is the real, earned number; `referralFeeKes` on
+   the partner itself is just what an admin expects, for their own reference.
+
+Extending this later to an automated partner API (so a "disbursed" webhook updates
+the request itself) would slot into `PATCH /api/admin/referrals/:id` without touching
+anything else — the manual path and an automated one both end up calling the same
+update.
 
 ## Verification delivery
 

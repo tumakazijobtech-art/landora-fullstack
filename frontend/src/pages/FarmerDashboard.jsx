@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import PaymentModal from '../components/PaymentModal.jsx';
+import ReferralPanel from '../components/ReferralPanel.jsx';
 
 export default function FarmerDashboard() {
   const { token } = useAuth();
@@ -12,7 +13,7 @@ export default function FarmerDashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [payFor, setPayFor] = useState(null); // application being paid for, or null
+  const [payFor, setPayFor] = useState(null); // { application, feeType: 'commission' | 'commitment' } or null
   const [subscribing, setSubscribing] = useState(false); // premium subscription modal open
 
   function load() {
@@ -39,9 +40,12 @@ export default function FarmerDashboard() {
 
   // A lease is only actually secured once the commission has been paid — this looks
   // across the farmer's own payment history for a successful "commission" payment
-  // tied to this application.
+  // tied to this application. Same pattern for the commitment fee paid at apply time.
   function commissionPaid(applicationId) {
     return payments.some((p) => p.type === 'commission' && p.status === 'success' && p.application?._id === applicationId);
+  }
+  function commitmentPaid(applicationId) {
+    return payments.some((p) => p.type === 'commitment' && p.status === 'success' && p.application?._id === applicationId);
   }
 
   const isPremium = subscription?.plan === 'premium';
@@ -118,6 +122,8 @@ export default function FarmerDashboard() {
           </div>
         )}
 
+        <ReferralPanel />
+
         {applications.length === 0 ? (
           <div className="empty-state">
             You haven't applied to any parcels yet. <Link to="/marketplace">Browse available land</Link>.
@@ -142,8 +148,24 @@ export default function FarmerDashboard() {
                   </div>
                 )}
                 {a.status === 'pending' && (
-                  <div style={{ fontSize: 12, marginTop: 12, color: 'var(--s500)' }}>
-                    To withdraw this application, please contact the Landora team — withdrawals require admin approval.
+                  <div style={{ marginTop: 12 }}>
+                    {commitmentPaid(a._id) ? (
+                      <div className="info-box" style={{ marginBottom: 0 }}>
+                        Commitment fee paid — your application is flagged as a serious applicant.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <button type="button" className="btn-outline-green" onClick={() => setPayFor({ application: a, feeType: 'commitment' })}>
+                          Pay commitment fee via M-Pesa
+                        </button>
+                        <span style={{ fontSize: 12, color: 'var(--s500)' }}>
+                          A small, one-time fee that signals serious intent to the landowner.
+                        </span>
+                      </div>
+                    )}
+                    <div style={{ fontSize: 12, marginTop: 10, color: 'var(--s500)' }}>
+                      To withdraw this application, please contact the Landora team — withdrawals require admin approval.
+                    </div>
                   </div>
                 )}
                 {a.status === 'accepted' && (
@@ -153,7 +175,7 @@ export default function FarmerDashboard() {
                     </div>
                   ) : (
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <button type="button" className="btn-primary" onClick={() => setPayFor(a)}>
+                      <button type="button" className="btn-primary" onClick={() => setPayFor({ application: a, feeType: 'commission' })}>
                         Pay lease commission via M-Pesa
                       </button>
                       <span style={{ fontSize: 12, color: 'var(--s500)' }}>
@@ -171,10 +193,14 @@ export default function FarmerDashboard() {
       <PaymentModal
         open={!!payFor}
         onClose={() => setPayFor(null)}
-        type="commission"
-        applicationId={payFor?._id}
-        title="Pay lease commission"
-        description={`Secures your lease on ${payFor?.parcel?.title || 'this parcel'}. The exact amount is calculated from the lease value and shown once the M-Pesa prompt is sent.`}
+        type={payFor?.feeType}
+        applicationId={payFor?.application?._id}
+        title={payFor?.feeType === 'commitment' ? 'Pay commitment fee' : 'Pay lease commission'}
+        description={
+          payFor?.feeType === 'commitment'
+            ? `Signals serious intent on ${payFor?.application?.parcel?.title || 'this application'}. The amount is shown once the M-Pesa prompt is sent.`
+            : `Secures your lease on ${payFor?.application?.parcel?.title || 'this parcel'}. The exact amount is calculated from the lease value and shown once the M-Pesa prompt is sent.`
+        }
         onSuccess={() => {
           load().catch((err) => setError(err.message));
         }}

@@ -189,6 +189,24 @@ export const api = {
     return request(`/intelligence/report${qs ? `?${qs}` : ''}`, { token });
   },
 
+  // Financing & insurance referrals (§8/§9) — Landora doesn't lend/underwrite, just
+  // connects users to partners and tracks the introduction through to commission.
+  referralPartners: (type, token) => request(`/referrals/partners${type ? `?type=${type}` : ''}`, { token }),
+  createReferral: (payload, token) => request('/referrals', { method: 'POST', body: payload, token }),
+  myReferrals: (token) => request('/referrals/mine', { token }),
+
+  // Admin: manage the partner list and move referral requests through to a recorded
+  // commission once the partner actually pays out.
+  adminReferralPartners: (token) => request('/admin/referral-partners', { token }),
+  adminCreateReferralPartner: (payload, token) => request('/admin/referral-partners', { method: 'POST', body: payload, token }),
+  adminUpdateReferralPartner: (id, payload, token) => request(`/admin/referral-partners/${id}`, { method: 'PATCH', body: payload, token }),
+  adminDeleteReferralPartner: (id, token) => request(`/admin/referral-partners/${id}`, { method: 'DELETE', token }),
+  adminReferrals: (token, params = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return request(`/admin/referrals${qs ? `?${qs}` : ''}`, { token });
+  },
+  adminUpdateReferral: (id, payload, token) => request(`/admin/referrals/${id}`, { method: 'PATCH', body: payload, token }),
+
   // Admin: platform-wide fee configuration (commission %, verification/lease-contract
   // prices, subscription tiers, and the M-Pesa till/shortcode) and the full payment
   // ledger.

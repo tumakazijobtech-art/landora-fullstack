@@ -6,6 +6,8 @@ const AuthSettings = require('../models/AuthSettings');
 const WaitlistEntry = require('../models/WaitlistEntry');
 const FeeSettings = require('../models/FeeSettings');
 const Payment = require('../models/Payment');
+const ReferralPartner = require('../models/ReferralPartner');
+const ReferralRequest = require('../models/ReferralRequest');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const cache = require('../middleware/cache');
 
@@ -300,6 +302,7 @@ router.get('/fee-settings', async (req, res) => {
 router.patch(
   '/fee-settings',
   [
+    body('commitment.feeKes').optional().isFloat({ min: 0 }),
     body('commission.percent').optional().isFloat({ min: 0, max: 100 }),
     body('commission.minKes').optional().isFloat({ min: 0 }),
     body('commission.maxKes').optional().isFloat({ min: 0 }),
@@ -327,7 +330,7 @@ router.patch(
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
     const fees = await FeeSettings.getSingleton();
-    const groups = ['commission', 'verification', 'leaseContract', 'landownerSubscription', 'farmerPremium', 'mpesa', 'gating', 'intelligence'];
+    const groups = ['commitment', 'commission', 'verification', 'leaseContract', 'landownerSubscription', 'farmerPremium', 'mpesa', 'gating', 'intelligence'];
     groups.forEach((group) => {
       if (req.body[group] && typeof req.body[group] === 'object') {
         fees[group] = { ...(fees[group] ? fees[group].toObject() : {}), ...req.body[group] };
@@ -342,7 +345,7 @@ router.patch(
 router.get(
   '/payments',
   [
-    query('type').optional().isIn(['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report']),
+    query('type').optional().isIn(['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report']),
     query('status').optional().isIn(['pending', 'success', 'failed', 'cancelled']),
   ],
   async (req, res) => {
@@ -366,6 +369,122 @@ router.get(
     ]);
 
     res.json({ payments, totals });
+  }
+);
+
+// Admin: financing/insurance partners — §8/§9 of the business model. Landora earns a
+// commission when a referral converts, recorded manually on the ReferralRequest once
+// the partner actually pays (see the referral-request endpoints below); this list is
+// just who a farmer/landowner can currently be introduced to.
+router.get('/referral-partners', async (req, res) => {
+  const partners = await ReferralPartner.find().sort({ type: 1, name: 1 }).lean();
+  res.json({ partners });
+});
+
+router.post(
+  '/referral-partners',
+  [
+    body('name').trim().isLength({ min: 1, max: 120 }),
+    body('type').isIn(['financing', 'insurance']),
+    body('description').optional({ checkFalsy: true }).trim().isLength({ max: 500 }),
+    body('contactEmail').optional({ checkFalsy: true }).trim().isLength({ max: 160 }),
+    body('contactPhone').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('referralFeeKes').optional().isFloat({ min: 0 }),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+    const partner = await ReferralPartner.create(req.body);
+    res.status(201).json({ partner });
+  }
+);
+
+router.patch(
+  '/referral-partners/:id',
+  [
+    body('name').optional().trim().isLength({ min: 1, max: 120 }),
+    body('type').optional().isIn(['financing', 'insurance']),
+    body('description').optional({ checkFalsy: true }).trim().isLength({ max: 500 }),
+    body('contactEmail').optional({ checkFalsy: true }).trim().isLength({ max: 160 }),
+    body('contactPhone').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('referralFeeKes').optional().isFloat({ min: 0 }),
+    body('active').optional().isBoolean(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+    const partner = await ReferralPartner.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!partner) return res.status(404).json({ error: 'Partner not found' });
+    res.json({ partner });
+  }
+);
+
+router.delete('/referral-partners/:id', async (req, res) => {
+  const partner = await ReferralPartner.findByIdAndDelete(req.params.id);
+  if (!partner) return res.status(404).json({ error: 'Partner not found' });
+  res.json({ ok: true });
+});
+
+// Admin: every referral request, and moving one forward as the partner reports back
+// (there's no partner API integration in this pass, so this is manual).
+router.get(
+  '/referrals',
+  [
+    query('status').optional().isIn(['submitted', 'contacted', 'approved', 'declined', 'disbursed']),
+    query('type').optional().isIn(['financing', 'insurance']),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Invalid filter parameters' });
+
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.type) filter.type = req.query.type;
+
+    const referrals = await ReferralRequest.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .populate('user', 'name email phone role')
+      .populate('partner', 'name type')
+      .populate('parcel', 'title county')
+      .lean();
+
+    const disbursedTotal = await ReferralRequest.aggregate([
+      { $match: { status: 'disbursed' } },
+      { $group: { _id: '$type', total: { $sum: '$commissionKes' }, count: { $sum: 1 } } },
+    ]);
+
+    res.json({ referrals, disbursedTotal });
+  }
+);
+
+router.patch(
+  '/referrals/:id',
+  [
+    body('status').optional().isIn(['submitted', 'contacted', 'approved', 'declined', 'disbursed']),
+    body('adminNote').optional({ checkFalsy: true }).trim().isLength({ max: 1000 }),
+    body('commissionKes').optional().isFloat({ min: 0 }),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    const referral = await ReferralRequest.findById(req.params.id);
+    if (!referral) return res.status(404).json({ error: 'Referral request not found' });
+
+    if (req.body.status) referral.status = req.body.status;
+    if (req.body.adminNote !== undefined) referral.adminNote = req.body.adminNote;
+    if (req.body.commissionKes !== undefined) referral.commissionKes = req.body.commissionKes;
+
+    // Marking a referral "disbursed" without a commission amount would silently
+    // undercount revenue — require one at that point, even if it's set later on a
+    // separate edit before disbursement is confirmed.
+    if (referral.status === 'disbursed' && referral.commissionKes == null) {
+      return res.status(400).json({ error: 'Enter the commission amount before marking a referral as disbursed' });
+    }
+
+    await referral.save();
+    res.json({ referral });
   }
 );
 

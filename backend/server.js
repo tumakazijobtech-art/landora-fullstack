@@ -24,6 +24,7 @@ const waitlistRoutes = require('./routes/waitlist');
 const paymentRoutes = require('./routes/payments');
 const subscriptionRoutes = require('./routes/subscriptions');
 const intelligenceRoutes = require('./routes/intelligence');
+const referralRoutes = require('./routes/referrals');
 
 const app = express();
 
@@ -83,6 +84,7 @@ app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/intelligence', intelligenceRoutes);
+app.use('/api/referrals', referralRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 

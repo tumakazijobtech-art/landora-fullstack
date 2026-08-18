@@ -16,6 +16,11 @@ const router = express.Router();
 // subscriptions) always reflects whatever the admin dashboard currently has saved.
 async function resolveAmount(type, tier, { application, parcel, county }, fees) {
   switch (type) {
+    case 'commitment': {
+      // Buyer commitment fee — flat, tied to a specific application.
+      if (!application) throw Object.assign(new Error('An application is required for a commitment fee payment'), { status: 400 });
+      return { amount: fees.commitment.feeKes, description: 'Landora application commitment fee' };
+    }
     case 'commission': {
       // §1 — a percentage of the first year's lease value, bounded by min/max.
       if (!parcel) throw Object.assign(new Error('A parcel is required for a commission payment'), { status: 400 });
@@ -69,7 +74,7 @@ router.post(
   '/initiate',
   requireAuth,
   [
-    body('type').isIn(['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report']),
+    body('type').isIn(['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report']),
     body('tier').optional({ checkFalsy: true }).trim().isLength({ max: 40 }),
     body('applicationId').optional({ checkFalsy: true }).isMongoId(),
     body('parcelId').optional({ checkFalsy: true }).isMongoId(),
