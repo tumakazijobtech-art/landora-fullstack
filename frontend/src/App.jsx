@@ -27,6 +27,7 @@ const AdminParcelEditor = lazy(() => import('./pages/AdminParcelEditor.jsx'));
 const AdminLandUses = lazy(() => import('./pages/AdminLandUses.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const Saved = lazy(() => import('./pages/Saved.jsx'));
+const LandIntelligence = lazy(() => import('./pages/LandIntelligence.jsx'));
 
 function PageFallback() {
   return <div className="section"><div className="section-inner">Loading…</div></div>;
@@ -86,6 +87,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Saved />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/intelligence"
+              element={
+                <ProtectedRoute>
+                  <LandIntelligence />
                 </ProtectedRoute>
               }
             />

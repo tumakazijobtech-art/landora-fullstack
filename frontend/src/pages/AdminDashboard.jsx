@@ -386,13 +386,13 @@ function FeeSettingsPanel({ token }) {
   if (loading) return <div className="empty-state">Loading…</div>;
   if (!fees) return null;
 
-  const numberField = (group, field, label, hint) => (
+  const numberField = (group, field, label, hint, min = 0) => (
     <div className="fee-settings-field" key={`${group}.${field}`}>
       <label htmlFor={`${group}-${field}`}>{label}</label>
       <input
         id={`${group}-${field}`}
         type="number"
-        min="0"
+        min={min}
         step="1"
         value={fees[group][field]}
         onChange={(e) => update(group, field, e.target.value === '' ? '' : Number(e.target.value))}
@@ -457,6 +457,21 @@ function FeeSettingsPanel({ token }) {
         {numberField('farmerPremium', 'monthlyKes', 'Premium access (KES)')}
       </div>
 
+      <div className="fee-settings-group-title">Subscription gating (what each plan unlocks)</div>
+      <div className="fee-settings-grid">
+        {numberField('gating', 'freeListingLimit', 'Free plan listing limit')}
+        {numberField('gating', 'individualListingLimit', 'Individual plan listing limit', '-1 = unlimited', -1)}
+        {numberField('gating', 'multiPropertyListingLimit', 'Multi-property plan listing limit', '-1 = unlimited', -1)}
+        {numberField('gating', 'institutionalListingLimit', 'Institutional plan listing limit', '-1 = unlimited', -1)}
+        {numberField('gating', 'earlyAccessHours', 'Early access window (hours)', 'How long new listings are premium-only. 0 = off')}
+      </div>
+
+      <div className="fee-settings-group-title">Land price intelligence (paid per-region report)</div>
+      <div className="fee-settings-grid">
+        {numberField('intelligence', 'reportFeeKes', 'Report fee (KES)')}
+        {numberField('intelligence', 'reportValidityDays', 'Report validity (days)', 'How long a purchased report stays accessible', 1)}
+      </div>
+
       <div className="fee-settings-group-title">M-Pesa collection (Buy Goods / Till)</div>
       <div className="fee-settings-grid">
         {textField('mpesa', 'tillNumber', 'Till number (PartyB)', 'e.g. 174379')}
@@ -506,6 +521,7 @@ function PaymentsPanel({ token }) {
     lease_contract: 'Lease contract',
     landowner_subscription: 'Landowner subscription',
     farmer_premium: 'Farmer premium',
+    intelligence_report: 'Intelligence report',
   };
 
   return (

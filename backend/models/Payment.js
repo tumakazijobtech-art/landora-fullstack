@@ -13,7 +13,7 @@ const paymentSchema = new mongoose.Schema(
     // amount is computed.
     type: {
       type: String,
-      enum: ['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium'],
+      enum: ['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report'],
       required: true,
       index: true,
     },
@@ -23,6 +23,12 @@ const paymentSchema = new mongoose.Schema(
 
     application: { type: mongoose.Schema.Types.ObjectId, ref: 'Application', index: true },
     parcel: { type: mongoose.Schema.Types.ObjectId, ref: 'Parcel', index: true },
+
+    // Only used by type 'intelligence_report' — which region/crop the paid report
+    // covers, so a user's entitlement to view it can be checked later without
+    // re-charging them (see routes/intelligence.js).
+    county: { type: String, trim: true, maxlength: 80 },
+    crop: { type: String, trim: true, maxlength: 60 },
 
     amount: { type: Number, required: true, min: 1 },
     phone: { type: String, required: true, trim: true, maxlength: 15 }, // normalized 2547XXXXXXXX

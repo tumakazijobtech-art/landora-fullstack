@@ -190,6 +190,14 @@ const parcelSchema = new mongoose.Schema(
     // considered full for the season. Defaults to the platform wide MAX_APPLICANTS
     // (see utils/constants.js) but an admin can override it per parcel.
     maxApplicants: { type: Number, min: 1, max: 500, default: 20 },
+
+    // Farmer premium subscription perk (§5 of the business model — "early access to
+    // new listings"). Set at creation from FeeSettings.gating.earlyAccessHours; a
+    // listing is only visible on the public marketplace once now() >= publicFrom.
+    // Premium farmers and admins see it immediately regardless — see the
+    // GET /api/parcels list route. Defaults to "now" (i.e. immediately public) so
+    // this has zero effect unless an admin turns early access on.
+    publicFrom: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );

@@ -23,6 +23,25 @@ async function requireAuth(req, res, next) {
   }
 }
 
+// Like requireAuth, but never rejects the request — attaches req.user if a valid
+// token is present, otherwise leaves it undefined and continues. Used on public
+// endpoints (the marketplace list) that need to know a caller's entitlements
+// (e.g. farmer premium early access) without requiring a login.
+async function optionalAuth(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) return next();
+
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(payload.sub).select('-passwordHash');
+    if (user) req.user = user;
+    next();
+  } catch {
+    next(); // invalid/expired token on a public endpoint — just treat as anonymous
+  }
+}
+
 // Restricts a route to specific roles. Use after requireAuth.
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -33,4 +52,4 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { requireAuth, requireRole };
+module.exports = { requireAuth, requireRole, optionalAuth };

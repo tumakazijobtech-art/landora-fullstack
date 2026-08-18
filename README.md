@@ -37,6 +37,15 @@ every listing and application you see comes from an account created through the 
   (`TransactionType: CustomerBuyGoodsOnline`). Every fee is editable from
   `/admin` → **Fees & payments** — nothing is hardcoded, so a price change takes effect
   on the very next payment with no redeploy. See "Payments (M-Pesa)" below.
+- **Subscription gating** — a landowner's plan caps how many listings they can have at
+  once (unlimited on the institutional tier); a farmer's Premium plan unlocks the full
+  county x crop price-analytics breakdown and, if an admin turns on an early-access
+  window, sees new listings before free users do. See "Subscription gating" below.
+- **Land price intelligence (§6)** — a free marketplace-wide teaser (`/intelligence`)
+  plus a paid, per-county/crop report: price trend, demand score, water/financing/
+  insurance rates, and a suggested price band. Sold as a one-off, time-limited M-Pesa
+  purchase to anyone logged in — farmer, landowner, or (once you add the account type)
+  an institutional buyer. See "Land price intelligence" below.
 
 This does **not** yet include the other role dashboards from the original design
 (investor, insurer, agronomist, agrovet, transporter), live chat, insurance payout
@@ -159,7 +168,71 @@ without a tunnel), the frontend's payment modal still resolves the outcome — `
 /api/payments/:id/status` falls back to polling Safaricom's STK query endpoint
 directly, so a payment doesn't get stuck showing "waiting" forever.
 
+## Subscription gating
+
+Paying for a `landowner_subscription` or `farmer_premium` fee isn't just a payment
+record — it actually unlocks something, tracked in a `Subscription` per user
+(`backend/models/Subscription.js`, `backend/services/subscriptions.js`). A
+subscription is "active" while `currentPeriodEnd` is in the future; paying again
+before it lapses extends the existing period rather than wasting the time already
+paid for, and a landowner switching tiers takes effect immediately.
+
+**What each side currently gates:**
+
+- **Landowners** — a plan caps how many listings you can have at once
+  (`Admin → Fees & payments → Subscription gating`, per-tier, `-1` = unlimited).
+  Enforced server-side in `POST /api/parcels` — the create endpoint itself rejects a
+  new listing over the cap, so this can't be bypassed by calling the API directly.
+  The landowner dashboard shows the current plan, listing count, and
+  subscribe/upgrade buttons.
+- **Farmers** — an active Premium subscription unlocks the full price-intelligence
+  breakdown (`GET /api/parcels/price-analytics`, county x crop averages); free
+  farmers get a single marketplace-wide average as a teaser. Premium also unlocks
+  **early access**: if an admin sets `gating.earlyAccessHours` above 0, a brand-new
+  listing is only visible to Premium farmers and admins until that window passes —
+  everyone else (including anonymous visitors) sees it once it's public. This is off
+  by default (`earlyAccessHours: 0`), so it has zero effect until an admin turns it
+  on.
+
+**A caching note, if you touch the marketplace list route:** `GET /api/parcels`
+normally caches its JSON response by URL (`middleware/cache.js`) since it's the
+highest-traffic endpoint and identical for every anonymous visitor. Early access
+breaks that assumption — the same URL can now correctly return different results for
+a Premium farmer than for everyone else — so the route only ever serves/writes the
+cache for requests with no `Authorization` header; any logged-in request is always
+computed fresh (see `cacheGetAnonymousOnly` in `routes/parcels.js`). If you add more
+entitlement-based filtering to that route, keep it inside that same guard rather than
+caching it — a stale cache entry here is a bug, not just an efficiency loss.
+
+`GET /api/subscriptions/mine` returns a user's own current plan for both types
+(`{ landowner: {...}, farmer: {...} }`) — the frontend dashboards use this to know
+what to show; it's the only place that should be trusted for "what plan is this user
+actually on right now."
+
+## Land price intelligence
+
+`/intelligence` (any logged-in user) is §6 of the business model: a free
+marketplace-wide teaser (`GET /api/intelligence/summary`, no auth) plus a paid,
+per-county/crop report (`GET /api/intelligence/report`). Report price and validity
+period are admin-editable under **Fees & payments → Land price intelligence**.
+
+The full report — price trend over the last 90 days, a demand score (average
+applications per listing in that region), water access/financing/insurance rates, and
+a suggested price band — is computed live from whatever's currently listed and
+applied to, so it's never stale data. It's gated behind a successful
+`intelligence_report` payment scoped to that county (and, if bought for a specific
+crop, that crop only — a county-wide "all crops" purchase unlocks every crop within
+it). Buying again after the report expires (`reportValidityDays`, default 30) charges
+again; buying early doesn't extend anything, since — unlike a subscription — a report
+is a one-off snapshot rather than a recurring plan.
+
+`GET /api/intelligence/report` always returns the headline average and sample size
+even when the caller hasn't paid, so the teaser and the "buy report" prompt can share
+one endpoint — check the `unlocked` field to know whether the rest of the payload
+(trend/demand/rates/band) is present.
+
 ## Verification delivery
+
 
 The verification flow is implemented end to end in the API and UI. It generates separate,
 short-lived email and phone codes, stores only hashes, requires both codes, and supports:

@@ -175,6 +175,20 @@ export const api = {
   getPaymentStatus: (id, token) => request(`/payments/${id}/status`, { token }),
   myPayments: (token) => request('/payments/mine', { token }),
 
+  // Subscription gating — a user's own active landowner/farmer plan, and the
+  // premium-only farmer price analytics view. See backend/services/subscriptions.js
+  // for how a plan is derived from payment history.
+  mySubscriptions: (token) => request('/subscriptions/mine', { token }),
+  priceAnalytics: (token) => request('/parcels/price-analytics', { token }),
+
+  // Land price intelligence (§6) — a free marketplace-wide teaser, plus paid,
+  // time-limited reports per county/crop. See backend/routes/intelligence.js.
+  intelligenceSummary: () => request('/intelligence/summary'),
+  intelligenceReport: (params, token) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return request(`/intelligence/report${qs ? `?${qs}` : ''}`, { token });
+  },
+
   // Admin: platform-wide fee configuration (commission %, verification/lease-contract
   // prices, subscription tiers, and the M-Pesa till/shortcode) and the full payment
   // ledger.

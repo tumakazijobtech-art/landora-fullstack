@@ -8,14 +8,24 @@ export default function FarmerDashboard() {
   const { token } = useAuth();
   const [applications, setApplications] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [subscription, setSubscription] = useState(null); // { plan, currentPeriodEnd, active }
+  const [analytics, setAnalytics] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [payFor, setPayFor] = useState(null); // application being paid for, or null
+  const [subscribing, setSubscribing] = useState(false); // premium subscription modal open
 
   function load() {
-    return Promise.all([api.myApplications(token), api.myPayments(token)]).then(([appData, payData]) => {
+    return Promise.all([
+      api.myApplications(token),
+      api.myPayments(token),
+      api.mySubscriptions(token),
+      api.priceAnalytics(token),
+    ]).then(([appData, payData, subData, analyticsData]) => {
       setApplications(appData.applications);
       setPayments(payData.payments);
+      setSubscription(subData.farmer);
+      setAnalytics(analyticsData);
     });
   }
 
@@ -34,6 +44,8 @@ export default function FarmerDashboard() {
     return payments.some((p) => p.type === 'commission' && p.status === 'success' && p.application?._id === applicationId);
   }
 
+  const isPremium = subscription?.plan === 'premium';
+
   if (loading) return <div className="section"><div className="section-inner">Loading…</div></div>;
 
   return (
@@ -42,6 +54,69 @@ export default function FarmerDashboard() {
         <div className="section-eyebrow">Farmer dashboard</div>
         <h2 className="section-h2">Your applications</h2>
         {error && <div className="error-box">{error}</div>}
+
+        <div className="panel" style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--s500)' }}>Your plan</div>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>
+              {isPremium ? 'Premium' : 'Free'}
+              {isPremium && subscription?.currentPeriodEnd && (
+                <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--s500)', marginLeft: 8 }}>
+                  renews {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            {!isPremium && (
+              <div style={{ fontSize: 12, color: 'var(--s500)', marginTop: 2 }}>
+                Early access to new listings, advanced filters, and full price analytics.
+              </div>
+            )}
+          </div>
+          {!isPremium && (
+            <button type="button" className="btn-outline-green" onClick={() => setSubscribing(true)}>
+              Upgrade to Premium
+            </button>
+          )}
+        </div>
+
+        {analytics && (
+          <div className="panel" style={{ marginBottom: 24 }}>
+            <div className="card-title" style={{ marginBottom: 4 }}>Land price intelligence</div>
+            {analytics.overallAveragePricePerAcre != null ? (
+              <p className="card-sub" style={{ marginBottom: analytics.premium ? 12 : 0 }}>
+                Marketplace-wide average: <span className="payment-amount">KES {Number(analytics.overallAveragePricePerAcre).toLocaleString()}</span>{' '}
+                per acre per season, across {analytics.sampleSize} listing{analytics.sampleSize === 1 ? '' : 's'}.
+              </p>
+            ) : (
+              <p className="card-sub" style={{ marginBottom: 0 }}>Not enough listings yet to show pricing data.</p>
+            )}
+            {analytics.premium && analytics.breakdown?.length > 0 && (
+              <div style={{ overflowX: 'auto', marginTop: 8 }}>
+                <table className="data-table">
+                  <thead><tr><th>County</th><th>Crop</th><th>Avg. price / ac / season</th><th>Listings</th></tr></thead>
+                  <tbody>
+                    {analytics.breakdown.map((row) => (
+                      <tr key={`${row.county}-${row.crop}`}>
+                        <td>{row.county}</td>
+                        <td>{row.crop}</td>
+                        <td className="payment-amount">KES {Number(row.averagePricePerAcre).toLocaleString()}</td>
+                        <td>{row.sampleSize}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {!analytics.premium && analytics.upsell && (
+              <div className="info-box" style={{ marginTop: 12, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <span>{analytics.upsell}</span>
+                <button type="button" className="btn-outline-green" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setSubscribing(true)}>
+                  Upgrade
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {applications.length === 0 ? (
           <div className="empty-state">
@@ -100,6 +175,17 @@ export default function FarmerDashboard() {
         applicationId={payFor?._id}
         title="Pay lease commission"
         description={`Secures your lease on ${payFor?.parcel?.title || 'this parcel'}. The exact amount is calculated from the lease value and shown once the M-Pesa prompt is sent.`}
+        onSuccess={() => {
+          load().catch((err) => setError(err.message));
+        }}
+      />
+
+      <PaymentModal
+        open={subscribing}
+        onClose={() => setSubscribing(false)}
+        type="farmer_premium"
+        title="Upgrade to Premium"
+        description="Early access to new listings, advanced filters, and full price analytics by county and crop. Paying while a period is still active extends it, so nothing already paid for is lost."
         onSuccess={() => {
           load().catch((err) => setError(err.message));
         }}

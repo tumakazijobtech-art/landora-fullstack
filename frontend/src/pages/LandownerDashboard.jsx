@@ -10,6 +10,7 @@ export default function LandownerDashboard() {
   const [parcels, setParcels] = useState([]);
   const [applications, setApplications] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [subscription, setSubscription] = useState(null); // { plan, currentPeriodEnd, active }
   const [activeParcel, setActiveParcel] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -29,9 +30,13 @@ export default function LandownerDashboard() {
     return api.myPayments(token).then((data) => setPayments(data.payments));
   }
 
+  function loadSubscription() {
+    return api.mySubscriptions(token).then((data) => setSubscription(data.landowner));
+  }
+
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadParcels(), loadApplications(), loadPayments()])
+    Promise.all([loadParcels(), loadApplications(), loadPayments(), loadSubscription()])
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,6 +45,14 @@ export default function LandownerDashboard() {
   function hasSuccessfulPayment(type, matchField, id) {
     return payments.some((p) => p.type === type && p.status === 'success' && p[matchField]?._id === id);
   }
+
+  const planLabels = { free: 'Free', individual: 'Individual', multiProperty: 'Multiple properties', institutional: 'Institutional' };
+  const currentPlan = subscription?.plan || 'free';
+  const upgradeTiers = [
+    { tier: 'individual', label: 'Individual landowner' },
+    { tier: 'multiProperty', label: 'Multiple properties' },
+    { tier: 'institutional', label: 'Institutions / large landowners' },
+  ].filter((t) => t.tier !== currentPlan);
 
   async function handleFilterByParcel(id) {
     setActiveParcel(id);
@@ -69,6 +82,35 @@ export default function LandownerDashboard() {
           </div>
         </div>
         {error && <div className="error-box">{error}</div>}
+
+        <div className="panel" style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--s500)' }}>Your plan</div>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>
+              {planLabels[currentPlan] || currentPlan}
+              {subscription?.active && subscription.currentPeriodEnd && (
+                <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--s500)', marginLeft: 8 }}>
+                  renews {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--s500)', marginTop: 2 }}>{parcels.length} listing{parcels.length === 1 ? '' : 's'} currently</div>
+          </div>
+          {upgradeTiers.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {upgradeTiers.map((t) => (
+                <button
+                  key={t.tier}
+                  type="button"
+                  className="btn-outline-green"
+                  onClick={() => setPayAction({ type: 'landowner_subscription', tier: t.tier, label: t.label })}
+                >
+                  {currentPlan === 'free' ? `Subscribe: ${t.label}` : `Switch to ${t.label}`}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {parcels.length === 0 ? (
           <div className="empty-state">
@@ -193,15 +235,19 @@ export default function LandownerDashboard() {
         title={
           payAction?.type === 'verification'
             ? `${payAction?.tier === 'premium' ? 'Premium' : 'Basic'} land verification`
+            : payAction?.type === 'landowner_subscription'
+            ? `Subscribe: ${payAction?.label || ''}`
             : 'Digital lease contract'
         }
         description={
           payAction?.type === 'verification'
             ? `Have Landora verify ${payAction?.parcelTitle || 'this listing'} — ownership, boundaries, and risk flags. The amount is shown once the M-Pesa prompt is sent.`
+            : payAction?.type === 'landowner_subscription'
+            ? 'Monthly platform subscription. Paying while a period is still active extends it, so nothing already paid for is lost.'
             : `Generate a standardized digital lease agreement for ${payAction?.parcelTitle || 'this lease'}. The amount is shown once the M-Pesa prompt is sent.`
         }
         onSuccess={() => {
-          loadPayments().catch((err) => setError(err.message));
+          Promise.all([loadPayments(), loadSubscription(), loadParcels()]).catch((err) => setError(err.message));
         }}
       />
     </div>

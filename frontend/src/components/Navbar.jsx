@@ -62,6 +62,9 @@ export default function Navbar() {
           {user && (
             <Link className="nav-link" to="/saved">Saved</Link>
           )}
+          {user && user.role !== 'admin' && (
+            <Link className="nav-link" to="/intelligence">Land intelligence</Link>
+          )}
 
           {!user && (
             <>

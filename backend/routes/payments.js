@@ -6,6 +6,7 @@ const Application = require('../models/Application');
 const Parcel = require('../models/Parcel');
 const { requireAuth } = require('../middleware/auth');
 const mpesa = require('../services/mpesa');
+const { activateFromPayment } = require('../services/subscriptions');
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ const router = express.Router();
 // FeeSettings singleton — this is the one place the business model's fee logic is
 // implemented, so every payment (commission, verification, lease contract,
 // subscriptions) always reflects whatever the admin dashboard currently has saved.
-async function resolveAmount(type, tier, { application, parcel }, fees) {
+async function resolveAmount(type, tier, { application, parcel, county }, fees) {
   switch (type) {
     case 'commission': {
       // §1 — a percentage of the first year's lease value, bounded by min/max.
@@ -49,6 +50,13 @@ async function resolveAmount(type, tier, { application, parcel }, fees) {
       // §5 — flat monthly fee.
       return { amount: fees.farmerPremium.monthlyKes, description: 'Farmer premium subscription' };
     }
+    case 'intelligence_report': {
+      // §6 — flat fee per county/crop report.
+      return {
+        amount: fees.intelligence.reportFeeKes,
+        description: `Land intelligence report — ${county || 'region'}`,
+      };
+    }
     default:
       throw Object.assign(new Error('Unknown payment type'), { status: 400 });
   }
@@ -61,10 +69,12 @@ router.post(
   '/initiate',
   requireAuth,
   [
-    body('type').isIn(['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium']),
+    body('type').isIn(['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report']),
     body('tier').optional({ checkFalsy: true }).trim().isLength({ max: 40 }),
     body('applicationId').optional({ checkFalsy: true }).isMongoId(),
     body('parcelId').optional({ checkFalsy: true }).isMongoId(),
+    body('county').optional({ checkFalsy: true }).trim().isLength({ max: 80 }),
+    body('crop').optional({ checkFalsy: true }).trim().isLength({ max: 60 }),
     body('phone').trim().isLength({ min: 9, max: 15 }),
   ],
   async (req, res) => {
@@ -72,6 +82,12 @@ router.post(
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
     const { type, tier, applicationId, parcelId, phone } = req.body;
+    const county = req.body.county ? req.body.county.trim() : undefined;
+    const crop = req.body.crop ? req.body.crop.trim() : undefined;
+
+    if (type === 'intelligence_report' && !county) {
+      return res.status(400).json({ error: 'Choose a county to buy a report for' });
+    }
 
     let application = null;
     let parcel = null;
@@ -96,7 +112,7 @@ router.post(
     const fees = await FeeSettings.getSingleton();
     let amount, description;
     try {
-      ({ amount, description } = await resolveAmount(type, tier, { application, parcel }, fees));
+      ({ amount, description } = await resolveAmount(type, tier, { application, parcel, county }, fees));
     } catch (err) {
       return res.status(err.status || 400).json({ error: err.message });
     }
@@ -112,6 +128,8 @@ router.post(
       tier: tier || undefined,
       application: application ? application._id : undefined,
       parcel: parcel ? parcel._id : undefined,
+      county,
+      crop,
       amount,
       phone,
       accountReference,
@@ -166,6 +184,7 @@ router.post('/mpesa/callback', async (req, res) => {
 
   const payment = await Payment.findOne({ checkoutRequestId: stkCallback.CheckoutRequestID });
   if (!payment) return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+  const wasAlreadySuccess = payment.status === 'success';
 
   payment.rawCallback = stkCallback;
   payment.resultCode = stkCallback.ResultCode;
@@ -190,6 +209,12 @@ router.post('/mpesa/callback', async (req, res) => {
   }
 
   await payment.save();
+  // A subscription payment (landowner plan or farmer premium) activates/extends the
+  // plan the instant it succeeds — guarded so a retried/duplicate callback can never
+  // grant a second period for the same payment.
+  if (!wasAlreadySuccess && payment.status === 'success') {
+    await activateFromPayment(payment);
+  }
   res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
 });
 
@@ -221,6 +246,11 @@ router.get('/:id/status', requireAuth, async (req, res) => {
       // ResultCode 1037/2001-style "still processing" responses leave status as
       // pending — the UI will poll again shortly.
       if (payment.isModified()) await payment.save();
+      // The status guard above guarantees this payment was still 'pending' before
+      // this poll, so a transition to 'success' here can only happen once.
+      if (payment.status === 'success') {
+        await activateFromPayment(payment);
+      }
     } catch {
       // Query failed (e.g. Safaricom rate limit) — fall through and return whatever
       // we already have; the frontend will retry.

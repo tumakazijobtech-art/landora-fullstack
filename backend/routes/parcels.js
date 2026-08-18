@@ -3,11 +3,13 @@ const mongoose = require('mongoose');
 const { body, query, validationResult } = require('express-validator');
 const Parcel = require('../models/Parcel');
 const Application = require('../models/Application');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const FeeSettings = require('../models/FeeSettings');
+const { requireAuth, requireRole, optionalAuth } = require('../middleware/auth');
 const { generateReference } = require('../utils/reference');
 const { countyCentroid, distanceKm } = require('../utils/geo');
 const cache = require('../middleware/cache');
 const { MAX_APPLICANTS } = require('../utils/constants');
+const { getActivePlan, getListingLimit } = require('../services/subscriptions');
 
 const router = express.Router();
 
@@ -53,6 +55,21 @@ async function expireDeadlines() {
 
 function isObjectId(value) {
   return mongoose.Types.ObjectId.isValid(value) && String(new mongoose.Types.ObjectId(value)) === String(value);
+}
+
+// The shared cache.cacheGet middleware keys purely on URL, with no notion of who's
+// asking — fine for anonymous browsing, but wrong here once early access means two
+// different users can get two different correct answers for the same URL. So caching
+// only ever applies to anonymous requests (the overwhelming majority of marketplace
+// traffic); any request carrying a token is always computed fresh, so a logged-in
+// farmer's entitlement (premium early access, or lack of it) is never served from a
+// cache entry populated by someone else.
+function cacheGetAnonymousOnly(ttlMs) {
+  const cached = cache.cacheGet(ttlMs);
+  return (req, res, next) => {
+    if (req.headers.authorization) return next();
+    return cached(req, res, next);
+  };
 }
 
 // Public: browse/search/filter listings, including the Landora Match engine filters
@@ -193,7 +210,8 @@ router.get(
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 50 }),
   ],
-  cache.cacheGet(LIST_TTL_MS),
+  optionalAuth,
+  cacheGetAnonymousOnly(LIST_TTL_MS),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -210,7 +228,16 @@ router.get(
 
     await expireDeadlines();
 
+    // §5 of the business model — early access. Admins and farmers on an active
+    // premium subscription see every available listing immediately; everyone else
+    // (including anonymous visitors) only sees listings whose early-access window,
+    // if any, has already passed.
+    const bypassesEarlyAccess = req.user && (
+      req.user.role === 'admin' || (await getActivePlan(req.user._id, 'farmer')) === 'premium'
+    );
+
     const filter = { status: 'available' };
+    if (!bypassesEarlyAccess) filter.publicFrom = { $lte: new Date() };
     if (minScore) filter.score = minScore;
     if (search) filter.$text = { $search: search };
 
@@ -286,6 +313,42 @@ router.get(
     res.json({ parcels: pageItems, total, page, pages: Math.ceil(total / limit) || 1 });
   }
 );
+
+// Farmer: price intelligence — average lease rates by crop/county from live listings.
+// A first, minimal cut of §5's premium perk ("price analytics"). Free farmers get a
+// single marketplace-wide average as a teaser; premium farmers get the full
+// county x crop breakdown. Gated by an active farmer premium subscription, not by
+// role alone.
+router.get('/price-analytics', requireAuth, requireRole('farmer'), async (req, res) => {
+  const plan = await getActivePlan(req.user._id, 'farmer');
+  const isPremium = plan === 'premium';
+
+  const overall = await Parcel.aggregate([
+    { $match: { status: 'available' } },
+    { $group: { _id: null, avg: { $avg: '$pricePerAcrePerSeason' }, count: { $sum: 1 } } },
+  ]);
+  const overallAvg = overall[0] ? Math.round(overall[0].avg) : null;
+  const sampleSize = overall[0] ? overall[0].count : 0;
+
+  if (!isPremium) {
+    return res.json({
+      premium: false,
+      overallAveragePricePerAcre: overallAvg,
+      sampleSize,
+      upsell: 'Upgrade to Farmer Premium for a full price breakdown by county and crop.',
+    });
+  }
+
+  const breakdown = await Parcel.aggregate([
+    { $match: { status: 'available' } },
+    { $group: { _id: { county: '$county', crop: '$crop' }, avg: { $avg: '$pricePerAcrePerSeason' }, count: { $sum: 1 } } },
+    { $match: { count: { $gte: 1 } } },
+    { $sort: { '_id.county': 1, '_id.crop': 1 } },
+    { $project: { _id: 0, county: '$_id.county', crop: '$_id.crop', averagePricePerAcre: { $round: '$avg' }, sampleSize: '$count' } },
+  ]);
+
+  res.json({ premium: true, overallAveragePricePerAcre: overallAvg, sampleSize, breakdown });
+});
 
 // Suggests a fair lease rate range for a landowner who is still setting their price,
 // based on what similar parcels (same crop, then same county, then the whole
@@ -411,6 +474,33 @@ router.post(
 
     const cleanTags = Array.isArray(tags) ? tags.filter((t) => TAGS_ALLOWED.includes(t)) : [];
 
+    // §4 of the business model — a landowner's plan caps how many listings they can
+    // have at once (unlimited on the institutional tier). Checked here rather than
+    // relying on the frontend to hide the "new listing" button, since that's the
+    // only place this can't be bypassed.
+    const fees = await FeeSettings.getSingleton();
+    const plan = await getActivePlan(req.user._id, 'landowner');
+    const limit = getListingLimit(fees.gating, plan);
+    if (Number.isFinite(limit)) {
+      const currentCount = await Parcel.countDocuments({ owner: req.user._id });
+      if (currentCount >= limit) {
+        return res.status(403).json({
+          error: `Your ${plan} plan allows up to ${limit} listing${limit === 1 ? '' : 's'}. Upgrade under My properties to add more.`,
+          code: 'LISTING_LIMIT_REACHED',
+          plan,
+          limit,
+        });
+      }
+    }
+
+    // §5 of the business model — early access. A brand-new listing is only shown to
+    // premium farmers/admins for the configured window; publicFrom defaults to "now"
+    // so this has no effect unless an admin has set gating.earlyAccessHours > 0.
+    const earlyAccessHours = Number(fees.gating.earlyAccessHours || 0);
+    const publicFrom = earlyAccessHours > 0
+      ? new Date(Date.now() + earlyAccessHours * 60 * 60 * 1000)
+      : new Date();
+
     const parcel = await Parcel.create({
       owner: req.user._id,
       title, county, location, sizeAcres,
@@ -426,6 +516,7 @@ router.post(
       leaseDeadline: leaseDeadline || null,
       preBookingEnabled: preBookingEnabled !== false,
       enrichmentStatus: 'pending',
+      publicFrom,
     });
 
     res.status(201).json({ parcel });

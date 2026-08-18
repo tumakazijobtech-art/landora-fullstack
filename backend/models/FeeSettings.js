@@ -50,6 +50,29 @@ const feeSettingsSchema = new mongoose.Schema(
       monthlyKes: { type: Number, min: 0, default: 300 },
     },
 
+    // --- Subscription gating — what each plan actually unlocks. Listing limits are
+    // the number of listings (any status) a landowner on that plan may have at once;
+    // a negative number means unlimited. earlyAccessHours is how long a brand-new
+    // listing stays visible to premium farmers/admins only before it appears on the
+    // public marketplace for everyone else — 0 turns early access off entirely.
+    gating: {
+      freeListingLimit: { type: Number, default: 1 },
+      individualListingLimit: { type: Number, default: 5 },
+      multiPropertyListingLimit: { type: Number, default: 25 },
+      institutionalListingLimit: { type: Number, default: -1 },
+      earlyAccessHours: { type: Number, min: 0, default: 0 },
+    },
+
+    // --- §6 Land price intelligence — a paid, per-region report (avg price, trend,
+    // demand, water/financing/insurance rates, suggested price band) sold to
+    // farmers, landowners, agribusinesses, NGOs, banks, and other institutions. A
+    // buyer's access to a specific county/crop report is checked against their own
+    // payment history for reportValidityDays — see routes/intelligence.js.
+    intelligence: {
+      reportFeeKes: { type: Number, min: 0, default: 2000 },
+      reportValidityDays: { type: Number, min: 1, default: 30 },
+    },
+
     // --- M-Pesa Buy Goods collection details. tillNumber is used as PartyB on every
     // STK push (TransactionType CustomerBuyGoodsOnline). shortcode is the
     // BusinessShortCode used to build the STK password/timestamp — for most Buy

@@ -314,13 +314,20 @@ router.patch(
     body('mpesa.tillNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
     body('mpesa.shortcode').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
     body('mpesa.accountReferencePrefix').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('gating.freeListingLimit').optional().isInt({ min: 0 }),
+    body('gating.individualListingLimit').optional().isInt({ min: -1 }),
+    body('gating.multiPropertyListingLimit').optional().isInt({ min: -1 }),
+    body('gating.institutionalListingLimit').optional().isInt({ min: -1 }),
+    body('gating.earlyAccessHours').optional().isFloat({ min: 0 }),
+    body('intelligence.reportFeeKes').optional().isFloat({ min: 0 }),
+    body('intelligence.reportValidityDays').optional().isInt({ min: 1 }),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
     const fees = await FeeSettings.getSingleton();
-    const groups = ['commission', 'verification', 'leaseContract', 'landownerSubscription', 'farmerPremium', 'mpesa'];
+    const groups = ['commission', 'verification', 'leaseContract', 'landownerSubscription', 'farmerPremium', 'mpesa', 'gating', 'intelligence'];
     groups.forEach((group) => {
       if (req.body[group] && typeof req.body[group] === 'object') {
         fees[group] = { ...(fees[group] ? fees[group].toObject() : {}), ...req.body[group] };
@@ -335,7 +342,7 @@ router.patch(
 router.get(
   '/payments',
   [
-    query('type').optional().isIn(['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium']),
+    query('type').optional().isIn(['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report']),
     query('status').optional().isIn(['pending', 'success', 'failed', 'cancelled']),
   ],
   async (req, res) => {
