@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { LOGO_URL } from '../constants.js';
 import PaymentModal from '../components/PaymentModal.jsx';
 import ReferralPanel from '../components/ReferralPanel.jsx';
+import BulkSearchPanel from '../components/BulkSearchPanel.jsx';
 
 export default function LandownerDashboard() {
   const { token, user } = useAuth();
@@ -114,6 +115,7 @@ export default function LandownerDashboard() {
         </div>
 
         <ReferralPanel />
+        <BulkSearchPanel />
 
         {parcels.length === 0 ? (
           <div className="empty-state">

@@ -8,6 +8,7 @@ const FeeSettings = require('../models/FeeSettings');
 const Payment = require('../models/Payment');
 const ReferralPartner = require('../models/ReferralPartner');
 const ReferralRequest = require('../models/ReferralRequest');
+const BulkSearchRequest = require('../models/BulkSearchRequest');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const cache = require('../middleware/cache');
 
@@ -324,13 +325,14 @@ router.patch(
     body('gating.earlyAccessHours').optional().isFloat({ min: 0 }),
     body('intelligence.reportFeeKes').optional().isFloat({ min: 0 }),
     body('intelligence.reportValidityDays').optional().isInt({ min: 1 }),
+    body('bulkSearch.defaultFeeKes').optional().isFloat({ min: 0 }),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
     const fees = await FeeSettings.getSingleton();
-    const groups = ['commitment', 'commission', 'verification', 'leaseContract', 'landownerSubscription', 'farmerPremium', 'mpesa', 'gating', 'intelligence'];
+    const groups = ['commitment', 'commission', 'verification', 'leaseContract', 'landownerSubscription', 'farmerPremium', 'mpesa', 'gating', 'intelligence', 'bulkSearch'];
     groups.forEach((group) => {
       if (req.body[group] && typeof req.body[group] === 'object') {
         fees[group] = { ...(fees[group] ? fees[group].toObject() : {}), ...req.body[group] };
@@ -345,7 +347,7 @@ router.patch(
 router.get(
   '/payments',
   [
-    query('type').optional().isIn(['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report']),
+    query('type').optional().isIn(['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report', 'bulk_search_fee']),
     query('status').optional().isIn(['pending', 'success', 'failed', 'cancelled']),
   ],
   async (req, res) => {
@@ -485,6 +487,69 @@ router.patch(
 
     await referral.save();
     res.json({ referral });
+  }
+);
+
+// Admin: institutional/agribusiness bulk search requests (§7). Reviewing one means
+// hand-picking matching parcels from the marketplace (the admin parcels list already
+// available to this dashboard) and setting an aggregation fee; the buyer then pays
+// via M-Pesa to unlock the proposal (see routes/payments.js and routes/bulkSearch.js).
+router.get(
+  '/bulk-search',
+  [query('status').optional().isIn(['submitted', 'reviewing', 'proposal_sent', 'fee_paid', 'fulfilled', 'declined'])],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Invalid filter parameters' });
+
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+
+    const requests = await BulkSearchRequest.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .populate('user', 'name email phone role')
+      .populate('matchedParcels', 'title county sizeAcres pricePerAcrePerSeason')
+      .lean();
+
+    res.json({ requests });
+  }
+);
+
+router.patch(
+  '/bulk-search/:id',
+  [
+    body('status').optional().isIn(['submitted', 'reviewing', 'proposal_sent', 'fee_paid', 'fulfilled', 'declined']),
+    body('matchedParcels').optional().isArray({ max: 200 }),
+    body('matchedParcels.*').optional().isMongoId(),
+    body('aggregationFeeKes').optional().isFloat({ min: 0 }),
+    body('adminNote').optional({ checkFalsy: true }).trim().isLength({ max: 1000 }),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    const request = await BulkSearchRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ error: 'Bulk search request not found' });
+
+    if (req.body.matchedParcels) request.matchedParcels = req.body.matchedParcels;
+    if (req.body.aggregationFeeKes !== undefined) request.aggregationFeeKes = req.body.aggregationFeeKes;
+    if (req.body.adminNote !== undefined) request.adminNote = req.body.adminNote;
+    if (req.body.status) request.status = req.body.status;
+
+    // A proposal needs at least one matched parcel and a fee to charge for it — the
+    // buyer can't pay for something that isn't priced yet.
+    if (request.status === 'proposal_sent') {
+      if (!request.matchedParcels || request.matchedParcels.length === 0) {
+        return res.status(400).json({ error: 'Add at least one matched parcel before sending a proposal' });
+      }
+      if (request.aggregationFeeKes == null) {
+        const fees = await FeeSettings.getSingleton();
+        request.aggregationFeeKes = fees.bulkSearch.defaultFeeKes;
+      }
+    }
+
+    await request.save();
+    res.json({ request });
   }
 );
 

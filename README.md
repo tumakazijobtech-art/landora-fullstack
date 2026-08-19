@@ -55,6 +55,11 @@ every listing and application you see comes from an account created through the 
   either dashboard, and admins track the request through to a manually-recorded
   commission once the partner actually pays. See "Financing & insurance referrals"
   below.
+- **Institutional bulk land search (§7)** — "find us 500 acres, suitable for maize,
+  with water access" as a request instead of manual browsing. An admin hand-picks
+  matching listings and sends a proposal; the buyer only sees which specific parcels
+  matched once they've paid the aggregation fee via M-Pesa. See "Bulk land search"
+  below.
 
 This does **not** yet include the other role dashboards from the original design
 (investor, insurer, agronomist, agrovet, transporter), live chat, insurance payout
@@ -266,6 +271,37 @@ Extending this later to an automated partner API (so a "disbursed" webhook updat
 the request itself) would slot into `PATCH /api/admin/referrals/:id` without touching
 anything else — the manual path and an automated one both end up calling the same
 update.
+
+## Bulk land search
+
+`/api/bulk-search` (§7 of the business model) is for the "we need 500-1,000 acres for
+contract farming" case — an institutional or agribusiness buyer describes what they
+need instead of browsing listing by listing, and Landora aggregates matching parcels
+for a fee. Like referrals, there's no automated matching engine in this pass — the
+whole thing is admin-curated:
+
+1. A buyer submits a request from their dashboard's "Bulk land search" panel — target
+   acreage, counties (optional — blank means any), crop/land use, a price ceiling, and
+   whether water access is required.
+2. An admin reviews it under `Admin → Bulk search`, searches the marketplace (the same
+   parcel list the Listings tab already has loaded — no extra fetch), and checks off
+   the listings that match. Moving the request to `proposal_sent` sets an aggregation
+   fee — defaults to `Admin → Fees & payments → bulkSearch.defaultFeeKes`, but is
+   editable per request since a 1,000-acre search across five counties is more work
+   than a 50-acre one in a single county.
+3. The buyer sees the request's status and how many parcels matched as soon as a
+   proposal is sent — but `GET /api/bulk-search/mine` deliberately withholds *which*
+   parcels until the aggregation fee is paid (`fee_paid` or `fulfilled` status only;
+   see the `unlockedStatuses` check in `routes/bulkSearch.js`), so the buyer is paying
+   to see the actual proposal, not just to submit the inquiry.
+4. Paying is the same M-Pesa flow as everything else (`type: 'bulk_search_fee'`,
+   `bulkSearchRequestId` on `POST /api/payments/initiate`) — a successful payment
+   automatically advances the request from `proposal_sent` to `fee_paid`
+   (`unlockBulkSearchIfPaid` in `routes/payments.js`), which is what actually unlocks
+   the parcel list on the buyer's next fetch.
+5. Any lease that actually results from a matched parcel still goes through the
+   normal apply → accept → pay-commission flow — the aggregation fee only covers the
+   search itself, not a transaction commission on top.
 
 ## Verification delivery
 

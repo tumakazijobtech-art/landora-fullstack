@@ -13,7 +13,7 @@ const paymentSchema = new mongoose.Schema(
     // amount is computed.
     type: {
       type: String,
-      enum: ['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report'],
+      enum: ['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report', 'bulk_search_fee'],
       required: true,
       index: true,
     },
@@ -23,6 +23,9 @@ const paymentSchema = new mongoose.Schema(
 
     application: { type: mongoose.Schema.Types.ObjectId, ref: 'Application', index: true },
     parcel: { type: mongoose.Schema.Types.ObjectId, ref: 'Parcel', index: true },
+    // Only used by type 'bulk_search_fee' — which aggregation request this fee
+    // unlocks. See routes/bulkSearch.js.
+    bulkSearchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'BulkSearchRequest', index: true },
 
     // Only used by type 'intelligence_report' — which region/crop the paid report
     // covers, so a user's entitlement to view it can be checked later without

@@ -207,6 +207,17 @@ export const api = {
   },
   adminUpdateReferral: (id, payload, token) => request(`/admin/referrals/${id}`, { method: 'PATCH', body: payload, token }),
 
+  // Institutional/agribusiness bulk land search (§7) — "find us N acres matching
+  // these criteria." An admin compiles a proposal; the buyer pays an aggregation
+  // fee to unlock it. See backend/routes/bulkSearch.js.
+  submitBulkSearch: (payload, token) => request('/bulk-search', { method: 'POST', body: payload, token }),
+  myBulkSearchRequests: (token) => request('/bulk-search/mine', { token }),
+  adminBulkSearchRequests: (token, params = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return request(`/admin/bulk-search${qs ? `?${qs}` : ''}`, { token });
+  },
+  adminUpdateBulkSearch: (id, payload, token) => request(`/admin/bulk-search/${id}`, { method: 'PATCH', body: payload, token }),
+
   // Admin: platform-wide fee configuration (commission %, verification/lease-contract
   // prices, subscription tiers, and the M-Pesa till/shortcode) and the full payment
   // ledger.

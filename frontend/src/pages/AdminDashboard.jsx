@@ -477,6 +477,11 @@ function FeeSettingsPanel({ token }) {
         {numberField('intelligence', 'reportValidityDays', 'Report validity (days)', 'How long a purchased report stays accessible', 1)}
       </div>
 
+      <div className="fee-settings-group-title">Institutional bulk land search (§7)</div>
+      <div className="fee-settings-grid">
+        {numberField('bulkSearch', 'defaultFeeKes', 'Default aggregation fee (KES)', 'Starting point when compiling a proposal — overridable per request')}
+      </div>
+
       <div className="fee-settings-group-title">M-Pesa collection (Buy Goods / Till)</div>
       <div className="fee-settings-grid">
         {textField('mpesa', 'tillNumber', 'Till number (PartyB)', 'e.g. 174379')}
@@ -528,6 +533,7 @@ function PaymentsPanel({ token }) {
     landowner_subscription: 'Landowner subscription',
     farmer_premium: 'Farmer premium',
     intelligence_report: 'Intelligence report',
+    bulk_search_fee: 'Bulk search fee',
   };
 
   return (
@@ -857,6 +863,185 @@ function ReferralsAdminPanel({ token }) {
   );
 }
 
+// Admin: institutional/agribusiness bulk search requests (§7). Reviewing one means
+// picking matching listings from the marketplace and pricing the proposal — parcels
+// is passed down from the main dashboard's own listings fetch rather than loaded
+// again here.
+function BulkSearchAdminPanel({ token, parcels }) {
+  const [requests, setRequests] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [reviewing, setReviewing] = useState(null);
+  const [reviewStatus, setReviewStatus] = useState('');
+  const [reviewFee, setReviewFee] = useState('');
+  const [reviewMatched, setReviewMatched] = useState([]); // parcel ids
+  const [reviewNote, setReviewNote] = useState('');
+  const [parcelSearch, setParcelSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function load(status) {
+    setLoading(true);
+    return api.adminBulkSearchRequests(token, status ? { status } : {})
+      .then((data) => setRequests(data.requests))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    load(statusFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  function openReview(r) {
+    setReviewing(r);
+    setReviewStatus(r.status);
+    setReviewFee(r.aggregationFeeKes ?? '');
+    setReviewMatched((r.matchedParcels || []).map((p) => p._id));
+    setReviewNote(r.adminNote || '');
+    setParcelSearch('');
+  }
+
+  function toggleParcel(id) {
+    setReviewMatched((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function saveReview(e) {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await api.adminUpdateBulkSearch(
+        reviewing._id,
+        {
+          status: reviewStatus,
+          matchedParcels: reviewMatched,
+          aggregationFeeKes: reviewFee === '' ? undefined : Number(reviewFee),
+          adminNote: reviewNote,
+        },
+        token
+      );
+      setReviewing(null);
+      await load(statusFilter);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const statusLabel = {
+    submitted: 'Submitted', reviewing: 'Reviewing', proposal_sent: 'Proposal sent',
+    fee_paid: 'Fee paid', fulfilled: 'Fulfilled', declined: 'Declined',
+  };
+
+  const filteredParcels = parcels.filter((p) => {
+    if (!reviewing) return false;
+    const matchesSearch = !parcelSearch || `${p.title} ${p.county}`.toLowerCase().includes(parcelSearch.toLowerCase());
+    const matchesCounty = !reviewing.counties?.length || reviewing.counties.includes(p.county);
+    return matchesSearch && matchesCounty;
+  });
+
+  return (
+    <div>
+      <div className="filter-bar" style={{ marginBottom: 12 }}>
+        <span className={`filter-badge ${statusFilter === '' ? 'active' : ''}`} onClick={() => setStatusFilter('')}>All</span>
+        {Object.keys(statusLabel).map((s) => (
+          <span key={s} className={`filter-badge ${statusFilter === s ? 'active' : ''}`} onClick={() => setStatusFilter(s)}>{statusLabel[s]}</span>
+        ))}
+      </div>
+
+      {error && <div className="error-box">{error}</div>}
+
+      {loading ? (
+        <div className="empty-state">Loading…</div>
+      ) : requests.length === 0 ? (
+        <div className="empty-state">No bulk search requests match this filter.</div>
+      ) : (
+        <div className="panel" style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead><tr><th>Buyer</th><th>Target</th><th>Counties</th><th>Crop</th><th>Status</th><th>Matched</th><th>Fee</th><th></th></tr></thead>
+            <tbody>
+              {requests.map((r) => (
+                <tr key={r._id}>
+                  <td>
+                    <div>{r.user?.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--s400)' }}>{r.user?.role}</div>
+                  </td>
+                  <td>{r.targetAcres} ac</td>
+                  <td style={{ fontSize: 12 }}>{r.counties?.length ? r.counties.join(', ') : 'Any'}</td>
+                  <td>{r.crop || 'Any'}</td>
+                  <td><span className={`status-pill ${r.status === 'fulfilled' || r.status === 'fee_paid' ? 'status-accepted' : r.status === 'declined' ? 'status-declined' : 'status-pending'}`}>{statusLabel[r.status] || r.status}</span></td>
+                  <td>{r.matchedParcels?.length || 0}</td>
+                  <td>{r.aggregationFeeKes != null ? `KES ${Number(r.aggregationFeeKes).toLocaleString()}` : 'N/A'}</td>
+                  <td><button type="button" className="btn-outline-green" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => openReview(r)}>Review</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {reviewing && (
+        <div className="modal-scrim" onClick={() => setReviewing(null)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 680 }}>
+            <button className="modal-close" onClick={() => setReviewing(null)} aria-label="Close">×</button>
+            <div className="card-title" style={{ marginBottom: 4 }}>Review bulk search request</div>
+            <p className="card-sub">
+              {reviewing.user?.name} wants {reviewing.targetAcres} acres
+              {reviewing.crop ? ` for ${reviewing.crop}` : ''}
+              {reviewing.counties?.length ? ` in ${reviewing.counties.join(', ')}` : ''}.
+              {reviewing.maxPricePerAcre ? ` Max KES ${Number(reviewing.maxPricePerAcre).toLocaleString()}/acre.` : ''}
+              {reviewing.waterAccessRequired ? ' Water access required.' : ''}
+            </p>
+            {reviewing.notes && <p className="card-sub" style={{ fontStyle: 'italic' }}>"{reviewing.notes}"</p>}
+
+            <form onSubmit={saveReview}>
+              <div className="fee-settings-grid" style={{ marginBottom: 14 }}>
+                <div className="fee-settings-field">
+                  <label>Status</label>
+                  <select value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)}>
+                    {Object.keys(statusLabel).map((s) => <option key={s} value={s}>{statusLabel[s]}</option>)}
+                  </select>
+                </div>
+                <div className="fee-settings-field">
+                  <label>Aggregation fee (KES)</label>
+                  <input type="number" min="0" value={reviewFee} onChange={(e) => setReviewFee(e.target.value)} placeholder="Defaults to platform default" />
+                </div>
+              </div>
+
+              <div className="fee-settings-field" style={{ marginBottom: 8 }}>
+                <label>Matched parcels ({reviewMatched.length} selected)</label>
+                <input type="text" placeholder="Search by title or county…" value={parcelSearch} onChange={(e) => setParcelSearch(e.target.value)} />
+              </div>
+              <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--g200)', borderRadius: 8, padding: 8, marginBottom: 14 }}>
+                {filteredParcels.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--s400)' }}>No listings match this search.</div>
+                ) : (
+                  filteredParcels.map((p) => (
+                    <label key={p._id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={reviewMatched.includes(p._id)} onChange={() => toggleParcel(p._id)} />
+                      {p.title} — {p.county}, {p.sizeAcres} ac, KES {Number(p.pricePerAcrePerSeason).toLocaleString()}/ac
+                    </label>
+                  ))
+                )}
+              </div>
+
+              <div className="fee-settings-field" style={{ marginBottom: 14 }}>
+                <label>Admin note</label>
+                <textarea rows={2} value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} />
+              </div>
+              <button type="submit" className="btn-primary" disabled={saving} style={{ width: '100%' }}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { token } = useAuth();
   const [tab, setTab] = useState('listings');
@@ -915,6 +1100,8 @@ export default function AdminDashboard() {
                 ? 'Fees & payments'
                 : tab === 'referrals'
                 ? 'Financing & insurance referrals'
+                : tab === 'bulkSearch'
+                ? 'Institutional bulk search'
                 : 'Branding'}
             </h2>
           </div>
@@ -937,6 +1124,9 @@ export default function AdminDashboard() {
           <button type="button" className={`admin-tab ${tab === 'referrals' ? 'active' : ''}`} onClick={() => setTab('referrals')}>
             Referrals
           </button>
+          <button type="button" className={`admin-tab ${tab === 'bulkSearch' ? 'active' : ''}`} onClick={() => setTab('bulkSearch')}>
+            Bulk search
+          </button>
           <button type="button" className={`admin-tab ${tab === 'branding' ? 'active' : ''}`} onClick={() => setTab('branding')}>
             Branding
           </button>
@@ -958,6 +1148,8 @@ export default function AdminDashboard() {
           </>
         ) : tab === 'referrals' ? (
           <ReferralsAdminPanel token={token} />
+        ) : tab === 'bulkSearch' ? (
+          <BulkSearchAdminPanel token={token} parcels={parcels} />
         ) : tab === 'branding' ? (
           <BrandingPanel />
         ) : (

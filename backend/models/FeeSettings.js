@@ -83,6 +83,15 @@ const feeSettingsSchema = new mongoose.Schema(
       reportValidityDays: { type: Number, min: 1, default: 30 },
     },
 
+    // --- §7 Institutional / agribusiness bulk land search — "find us 500 acres
+    // suitable for maize with water access". defaultFeeKes is the starting
+    // aggregation fee an admin sees when compiling a proposal for a request; they
+    // can override it per request (see BulkSearchRequest.aggregationFeeKes) since
+    // effort scales with how large or specific the search is.
+    bulkSearch: {
+      defaultFeeKes: { type: Number, min: 0, default: 5000 },
+    },
+
     // --- M-Pesa Buy Goods collection details. tillNumber is used as PartyB on every
     // STK push (TransactionType CustomerBuyGoodsOnline). shortcode is the
     // BusinessShortCode used to build the STK password/timestamp — for most Buy

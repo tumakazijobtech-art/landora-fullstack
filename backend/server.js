@@ -25,6 +25,7 @@ const paymentRoutes = require('./routes/payments');
 const subscriptionRoutes = require('./routes/subscriptions');
 const intelligenceRoutes = require('./routes/intelligence');
 const referralRoutes = require('./routes/referrals');
+const bulkSearchRoutes = require('./routes/bulkSearch');
 
 const app = express();
 
@@ -85,6 +86,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/intelligence', intelligenceRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/bulk-search', bulkSearchRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 

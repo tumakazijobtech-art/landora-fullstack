@@ -4,17 +4,30 @@ const Payment = require('../models/Payment');
 const FeeSettings = require('../models/FeeSettings');
 const Application = require('../models/Application');
 const Parcel = require('../models/Parcel');
+const BulkSearchRequest = require('../models/BulkSearchRequest');
 const { requireAuth } = require('../middleware/auth');
 const mpesa = require('../services/mpesa');
 const { activateFromPayment } = require('../services/subscriptions');
 
 const router = express.Router();
 
+// A bulk_search_fee payment succeeding unlocks that request's proposal — advance it
+// from 'proposal_sent' to 'fee_paid' so the buyer's matched parcels become visible
+// (see routes/bulkSearch.js). Guarded to only move a request that was still awaiting
+// payment, so a retried/duplicate success notification can't do anything twice.
+async function unlockBulkSearchIfPaid(payment) {
+  if (payment.type !== 'bulk_search_fee' || !payment.bulkSearchRequest) return;
+  await BulkSearchRequest.findOneAndUpdate(
+    { _id: payment.bulkSearchRequest, status: 'proposal_sent' },
+    { $set: { status: 'fee_paid' } }
+  );
+}
+
 // Computes the amount (in KES) for a payment type from the live, admin-editable
 // FeeSettings singleton — this is the one place the business model's fee logic is
 // implemented, so every payment (commission, verification, lease contract,
 // subscriptions) always reflects whatever the admin dashboard currently has saved.
-async function resolveAmount(type, tier, { application, parcel, county }, fees) {
+async function resolveAmount(type, tier, { application, parcel, county, bulkSearchRequest }, fees) {
   switch (type) {
     case 'commitment': {
       // Buyer commitment fee — flat, tied to a specific application.
@@ -62,6 +75,17 @@ async function resolveAmount(type, tier, { application, parcel, county }, fees) 
         description: `Land intelligence report — ${county || 'region'}`,
       };
     }
+    case 'bulk_search_fee': {
+      // §7 — aggregation fee for an institutional/agribusiness bulk search
+      // proposal. Priced per request by an admin (falls back to the platform
+      // default) once they've compiled matching parcels — see routes/admin.js.
+      if (!bulkSearchRequest) throw Object.assign(new Error('A bulk search request is required for this payment'), { status: 400 });
+      if (bulkSearchRequest.status !== 'proposal_sent' && bulkSearchRequest.status !== 'fee_paid') {
+        throw Object.assign(new Error('This request does not have a proposal ready to pay for yet'), { status: 400 });
+      }
+      const amount = bulkSearchRequest.aggregationFeeKes != null ? bulkSearchRequest.aggregationFeeKes : fees.bulkSearch.defaultFeeKes;
+      return { amount, description: 'Landora bulk land search aggregation fee' };
+    }
     default:
       throw Object.assign(new Error('Unknown payment type'), { status: 400 });
   }
@@ -74,10 +98,11 @@ router.post(
   '/initiate',
   requireAuth,
   [
-    body('type').isIn(['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report']),
+    body('type').isIn(['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report', 'bulk_search_fee']),
     body('tier').optional({ checkFalsy: true }).trim().isLength({ max: 40 }),
     body('applicationId').optional({ checkFalsy: true }).isMongoId(),
     body('parcelId').optional({ checkFalsy: true }).isMongoId(),
+    body('bulkSearchRequestId').optional({ checkFalsy: true }).isMongoId(),
     body('county').optional({ checkFalsy: true }).trim().isLength({ max: 80 }),
     body('crop').optional({ checkFalsy: true }).trim().isLength({ max: 60 }),
     body('phone').trim().isLength({ min: 9, max: 15 }),
@@ -86,16 +111,20 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
-    const { type, tier, applicationId, parcelId, phone } = req.body;
+    const { type, tier, applicationId, parcelId, bulkSearchRequestId, phone } = req.body;
     const county = req.body.county ? req.body.county.trim() : undefined;
     const crop = req.body.crop ? req.body.crop.trim() : undefined;
 
     if (type === 'intelligence_report' && !county) {
       return res.status(400).json({ error: 'Choose a county to buy a report for' });
     }
+    if (type === 'bulk_search_fee' && !bulkSearchRequestId) {
+      return res.status(400).json({ error: 'A bulk search request is required for this payment' });
+    }
 
     let application = null;
     let parcel = null;
+    let bulkSearchRequest = null;
 
     if (applicationId) {
       application = await Application.findById(applicationId).populate('parcel');
@@ -114,10 +143,18 @@ router.post(
       }
     }
 
+    if (bulkSearchRequestId) {
+      bulkSearchRequest = await BulkSearchRequest.findById(bulkSearchRequestId);
+      if (!bulkSearchRequest) return res.status(404).json({ error: 'Bulk search request not found' });
+      if (String(bulkSearchRequest.user) !== String(req.user._id) && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Not permitted to pay for this request' });
+      }
+    }
+
     const fees = await FeeSettings.getSingleton();
     let amount, description;
     try {
-      ({ amount, description } = await resolveAmount(type, tier, { application, parcel, county }, fees));
+      ({ amount, description } = await resolveAmount(type, tier, { application, parcel, county, bulkSearchRequest }, fees));
     } catch (err) {
       return res.status(err.status || 400).json({ error: err.message });
     }
@@ -133,6 +170,7 @@ router.post(
       tier: tier || undefined,
       application: application ? application._id : undefined,
       parcel: parcel ? parcel._id : undefined,
+      bulkSearchRequest: bulkSearchRequest ? bulkSearchRequest._id : undefined,
       county,
       crop,
       amount,
@@ -219,6 +257,7 @@ router.post('/mpesa/callback', async (req, res) => {
   // grant a second period for the same payment.
   if (!wasAlreadySuccess && payment.status === 'success') {
     await activateFromPayment(payment);
+    await unlockBulkSearchIfPaid(payment);
   }
   res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
 });
@@ -255,6 +294,7 @@ router.get('/:id/status', requireAuth, async (req, res) => {
       // this poll, so a transition to 'success' here can only happen once.
       if (payment.status === 'success') {
         await activateFromPayment(payment);
+        await unlockBulkSearchIfPaid(payment);
       }
     } catch {
       // Query failed (e.g. Safaricom rate limit) — fall through and return whatever

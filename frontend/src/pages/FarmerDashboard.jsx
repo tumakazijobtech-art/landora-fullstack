@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import PaymentModal from '../components/PaymentModal.jsx';
 import ReferralPanel from '../components/ReferralPanel.jsx';
+import BulkSearchPanel from '../components/BulkSearchPanel.jsx';
 
 export default function FarmerDashboard() {
   const { token } = useAuth();
@@ -123,6 +124,7 @@ export default function FarmerDashboard() {
         )}
 
         <ReferralPanel />
+        <BulkSearchPanel />
 
         {applications.length === 0 ? (
           <div className="empty-state">
