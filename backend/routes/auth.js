@@ -10,7 +10,11 @@ const {
   matchesCode,
   issueVerification,
   issuePasswordReset,
+  issuePhoneVerification,
+  confirmPhoneVerification,
 } = require('../services/verification');
+const { verifyNationalId } = require('../services/idVerification');
+const { notifySms } = require('../services/sms');
 
 const router = express.Router();
 
@@ -70,6 +74,12 @@ router.post(
     phoneValidator(),
     body('county').trim().notEmpty().withMessage('County is required').isLength({ max: 60 }),
     body('profilePicture').optional({ checkFalsy: true }).trim().isLength({ max: 2000 }),
+    // National ID is optional at sign-up itself (so registration is never blocked
+    // on it) but both buyers (farmers) and sellers (landowners) must have a
+    // verified one before they can apply to lease or publish a listing — see
+    // requireIdVerified in middleware/auth.js and POST /id-verification/submit
+    // below for submitting it later from the profile page.
+    body('nationalId').optional({ checkFalsy: true }).trim().isLength({ min: 5, max: 20 }),
     body('agreedToTerms')
       .custom((value) => value === true || value === 'true')
       .withMessage('You must agree to the Terms & Conditions and Privacy Policy'),
@@ -77,7 +87,7 @@ router.post(
   async (req, res) => {
     if (firstValidationError(req, res)) return;
 
-    const { name, email, password, role, phone, county, profilePicture } = req.body;
+    const { name, email, password, role, phone, county, profilePicture, nationalId } = req.body;
     const existing = await User.findOne({ $or: [{ email }, { phone }] });
     if (existing) {
       return res.status(409).json({
@@ -101,6 +111,17 @@ router.post(
     });
     await user.setPassword(password);
 
+    if (nationalId) {
+      user.nationalId = nationalId;
+      const result = await verifyNationalId({ idNumber: nationalId, fullName: name });
+      user.idVerification = {
+        ...result,
+        idNumber: nationalId,
+        submittedAt: new Date(),
+        ...(result.status === 'verified' ? { checkedAt: new Date(), checkedBy: 'IPRS (automated)' } : {}),
+      };
+    }
+
     if (verificationPolicy.requireOnSignup) {
       const verification = await issueVerification(user, 'signup');
       await user.save();
@@ -113,6 +134,7 @@ router.post(
 
     await user.save();
     const token = signToken(user);
+    notifySms(user.phone, `Welcome to Landora, ${user.name.split(' ')[0]}! Your ${role} account is ready.`, { purpose: 'welcome' });
     res.status(201).json({ token, user: user.toSafeJSON() });
   }
 );
@@ -235,6 +257,71 @@ router.post(
   }
 );
 
+// Any logged-in buyer (farmer) or seller (landowner) submits/resubmits their
+// national ID for verification — at registration this is optional, but it is
+// required (see requireIdVerified) before applying to lease or publishing a
+// listing. Runs the same optional IPRS-webhook check used at registration, and
+// otherwise queues the submission for an admin to check manually from
+// /admin (Users -> ID verification), the same fallback Parcel.titleVerification
+// uses for a land title that isn't yet reachable on Ardhisasa.
+router.post(
+  '/id-verification/submit',
+  requireAuth,
+  [body('nationalId').trim().isLength({ min: 5, max: 20 }).withMessage('Enter a valid national ID number')],
+  async (req, res) => {
+    if (firstValidationError(req, res)) return;
+
+    const { nationalId } = req.body;
+    const user = req.user;
+    user.nationalId = nationalId;
+
+    const result = await verifyNationalId({ idNumber: nationalId, fullName: user.name });
+    user.idVerification = {
+      ...result,
+      idNumber: nationalId,
+      submittedAt: new Date(),
+      ...(result.status === 'verified' ? { checkedAt: new Date(), checkedBy: 'IPRS (automated)' } : {}),
+    };
+    await user.save();
+
+    if (result.status === 'verified') {
+      notifySms(user.phone, 'Your Landora ID verification is complete. You can now apply to lease or publish listings.', { purpose: 'id_verified' });
+    }
+
+    res.json({ user: user.toSafeJSON() });
+  }
+);
+
+// Standalone phone-only OTP flow (distinct from the combined email+phone
+// signup/signin verification above) — the check that gates key actions like
+// applying to lease or publishing a listing regardless of the admin's
+// signup/signin verification policy.
+router.post('/phone/otp/request', requireAuth, async (req, res) => {
+  if (!req.user.phone) {
+    return res.status(400).json({ error: 'Add a phone number to your profile first' });
+  }
+  const verification = await issuePhoneVerification(req.user);
+  await req.user.save();
+  res.json({ verification });
+});
+
+router.post(
+  '/phone/otp/confirm',
+  requireAuth,
+  [body('code').isLength({ min: 6, max: 6 }).withMessage('Enter the 6-digit code sent to your phone')],
+  async (req, res) => {
+    if (firstValidationError(req, res)) return;
+    if (!confirmPhoneVerification(req.user, req.body.code)) {
+      return res.status(400).json({ error: 'That code is invalid or has expired' });
+    }
+    req.user.phoneVerified = true;
+    req.user.verification = undefined;
+    await req.user.save();
+    notifySms(req.user.phone, 'Your Landora phone number is now verified.', { purpose: 'phone_verified' });
+    res.json({ user: req.user.toSafeJSON() });
+  }
+);
+
 router.get('/me', requireAuth, async (req, res) => {
   res.json({ user: req.user.toSafeJSON() });
 });
@@ -260,7 +347,13 @@ router.patch(
     if (req.body.profilePicture !== undefined) user.profilePicture = req.body.profilePicture;
     if (req.body.phone) {
       const phone = normalizePhone(req.body.phone);
-      if (/^\+\d{10,15}$/.test(phone)) user.phone = phone;
+      if (/^\+\d{10,15}$/.test(phone) && phone !== user.phone) {
+        user.phone = phone;
+        // A changed number hasn't been proven to belong to this account yet — require
+        // a fresh phone OTP check (see POST /phone/otp/request) before it can be used
+        // to gate key actions again.
+        user.phoneVerified = false;
+      }
     }
     await user.save();
     res.json({ user: user.toSafeJSON() });

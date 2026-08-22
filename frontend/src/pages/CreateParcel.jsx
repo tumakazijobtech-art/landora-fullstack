@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import PricingCalculator from '../components/PricingCalculator.jsx';
@@ -76,7 +76,14 @@ export default function CreateParcel() {
             productivity report, boundary map, and a video walkthrough, usually within a few days.
             You'll see those appear on your listing automatically.
           </div>
-          {error && <div className="error-box">{error}</div>}
+          {error && (
+            <div className="error-box">
+              {error}
+              {/(phone number|national ID)/i.test(error) && (
+                <> <Link to="/profile">Verify from your profile →</Link></>
+              )}
+            </div>
+          )}
           <form onSubmit={handleSubmit}>
             <div className="field-group">
               <div className="field">

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { CheckIcon } from './Icons.jsx';
@@ -117,7 +118,14 @@ function WizardBody({ steps, step, form, update, error, submitting, type, next, 
         ))}
       </div>
 
-      {error && <div className="error-box">{error}</div>}
+      {error && (
+        <div className="error-box">
+          {error}
+          {/(phone number|national ID)/i.test(error) && (
+            <> <Link to="/profile">Verify from your profile →</Link></>
+          )}
+        </div>
+      )}
 
       {step === 0 && (
         <div className="field-group">

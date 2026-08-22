@@ -7,6 +7,10 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': 'http://localhost:4000',
+      // Live chat's realtime transport — proxied alongside /api so `npm run dev`
+      // needs no extra configuration to talk to the Socket.io server in
+      // backend/server.js.
+      '/socket.io': { target: 'http://localhost:4000', ws: true },
     },
   },
   build: {

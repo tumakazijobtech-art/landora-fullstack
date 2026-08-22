@@ -37,34 +37,36 @@ every listing and application you see comes from an account created through the 
   (`TransactionType: CustomerBuyGoodsOnline`). Every fee is editable from
   `/admin` → **Fees & payments** — nothing is hardcoded, so a price change takes effect
   on the very next payment with no redeploy. See "Payments (M-Pesa)" below.
-- **Subscription gating** — a landowner's plan caps how many listings they can have at
-  once (unlimited on the institutional tier); a farmer's Premium plan unlocks the full
-  county x crop price-analytics breakdown and, if an admin turns on an early-access
-  window, sees new listings before free users do. See "Subscription gating" below.
-- **Land price intelligence (§6)** — a free marketplace-wide teaser (`/intelligence`)
-  plus a paid, per-county/crop report: price trend, demand score, water/financing/
-  insurance rates, and a suggested price band. Sold as a one-off, time-limited M-Pesa
-  purchase to anyone logged in — farmer, landowner, or (once you add the account type)
-  an institutional buyer. See "Land price intelligence" below.
-- **Buyer commitment fee** — a small flat M-Pesa fee a farmer can pay right after
-  applying for a lease, before the landowner has decided anything. Landowners see a
-  "Commitment fee paid" badge on applicants who've paid it. Editable at Admin → Fees
-  & Payments, same as every other fee.
-- **Financing & insurance referrals (§8/§9)** — an admin-managed list of financing
-  and insurance partners; farmers and landowners can request an introduction from
-  either dashboard, and admins track the request through to a manually-recorded
-  commission once the partner actually pays. See "Financing & insurance referrals"
-  below.
-- **Institutional bulk land search (§7)** — "find us 500 acres, suitable for maize,
-  with water access" as a request instead of manual browsing. An admin hand-picks
-  matching listings and sends a proposal; the buyer only sees which specific parcels
-  matched once they've paid the aggregation fee via M-Pesa. See "Bulk land search"
-  below.
+- **Live chat between farmers and landowners** — a real-time (Socket.io) thread per
+  parcel, started from "Message the landowner" on any listing. REST endpoints back the
+  history/unread counts so chat works even before the socket connects, and an SMS nudge
+  (optional, see below) goes out if the recipient isn't online when a message arrives.
+- **A paid GIS land productivity report** — the report itself is still generated for
+  every parcel by the internal GIS/actuarial pass, but the full report (soil, rainfall,
+  vegetation index, market access, rainfall history, agronomic notes) is now gated
+  behind a one-time M-Pesa fee for the farmer viewing it. The parcel's own landowner and
+  admins always see it for free. Price is editable from `/admin` → **Fees & payments**.
+- **National ID verification for buyers and sellers** — both farmers and landowners can
+  submit their national ID from their profile page. Checked automatically against an
+  IPRS-style webhook when one is configured, otherwise queued for an admin to verify
+  manually from `/admin/users` — the same fallback pattern already used for land title
+  verification. Applying to lease a parcel, and publishing a listing, both require a
+  verified ID.
+- **Phone number verification via OTP, decoupled from sign-up/sign-in** — a farmer or
+  landowner verifies their phone once from their profile (a 6-digit SMS code), and that
+  verification then gates the same key actions (apply to lease, publish a listing, start
+  a chat) regardless of whether the admin's sign-up/sign-in verification policy is on.
+  Changing your phone number resets this and requires re-verifying.
+- **SMS notifications for key actions** — new application received, application
+  accepted/declined, ID verified/flagged, phone verified, and a chat message when the
+  recipient isn't online. All optional and additive: with no SMS provider configured,
+  these are just skipped (logged, not thrown), so nothing in the core workflow ever
+  depends on SMS actually being delivered. See "Notification delivery" below.
 
 This does **not** yet include the other role dashboards from the original design
-(investor, insurer, agronomist, agrovet, transporter), live chat, insurance payout
-simulation, or national-ID verification — those need either a lot more build time, or
-third-party provider accounts (see "Verification delivery" below).
+(investor, insurer, agronomist, agrovet, transporter) or insurance payout simulation —
+those need a lot more build time and, in insurance's case, a licensed underwriting
+partner.
 
 ## Project structure
 
@@ -127,12 +129,18 @@ every listing, edit any of them, add the verified key facts / productivity repor
 
 - **Auth**: email + password, hashed with bcrypt, JWT issued on login/register and sent
   as `Authorization: Bearer <token>` on every authenticated request. Tokens expire after
-  7 days (`JWT_EXPIRES_IN` in `.env`).
+  7 days (`JWT_EXPIRES_IN` in `.env`). The same JWT also authenticates a user's
+  Socket.io connection for live chat (see "Live chat" below).
 - **Parcel** (listing): owned by a landowner user; public browse/search endpoint only
-  ever returns parcels with `status: "available"`.
+  ever returns parcels with `status: "available"`. Publishing one requires a verified
+  phone and national ID (see "Buyer/seller national ID verification").
 - **Application**: a farmer applies to a parcel once (enforced by a unique DB index on
   `parcel + farmer`); the landowner accepts or declines it. Accepting flips the parcel's
-  status to `leased`, which removes it from public search automatically.
+  status to `leased`, which removes it from public search automatically. Applying
+  requires a verified phone and national ID, same as publishing a listing.
+- **Conversation / Message**: one conversation per `(parcel, farmer)` pair, same unique
+  index shape as Application. Either party sends messages once it exists; a farmer
+  starts it via "Message the landowner" on the listing page.
 - All write endpoints validate input server-side (`express-validator`) and check
   ownership before allowing edits — a landowner can only manage their own parcels, a
   farmer can only withdraw their own applications.
@@ -149,11 +157,9 @@ receives Safaricom's result and updates the payment record.
 
 **Where the money is charged, in the app:**
 
-- Farmer dashboard → right after applying (while the application is still
-  **pending**), "Pay commitment fee via M-Pesa" — a small flat fee that signals
-  serious intent; the landowner sees a "Commitment fee paid" badge on that applicant.
-  Once a lease application is **accepted**, "Pay lease commission via M-Pesa" (§1 of
-  the model — a % of the first year's lease value, floor/ceiling applied).
+- Farmer dashboard → once a lease application is **accepted**, "Pay lease commission
+  via M-Pesa" (§1 of the model — a % of the first year's lease value, floor/ceiling
+  applied).
 - Landowner dashboard → per listing, "Basic"/"Premium" **verification**, and per
   accepted application, "Generate basic/professional **lease contract**".
 - Admin dashboard → `/admin` → **Fees & payments** tab: edit every fee (commission %,
@@ -184,127 +190,7 @@ without a tunnel), the frontend's payment modal still resolves the outcome — `
 /api/payments/:id/status` falls back to polling Safaricom's STK query endpoint
 directly, so a payment doesn't get stuck showing "waiting" forever.
 
-## Subscription gating
-
-Paying for a `landowner_subscription` or `farmer_premium` fee isn't just a payment
-record — it actually unlocks something, tracked in a `Subscription` per user
-(`backend/models/Subscription.js`, `backend/services/subscriptions.js`). A
-subscription is "active" while `currentPeriodEnd` is in the future; paying again
-before it lapses extends the existing period rather than wasting the time already
-paid for, and a landowner switching tiers takes effect immediately.
-
-**What each side currently gates:**
-
-- **Landowners** — a plan caps how many listings you can have at once
-  (`Admin → Fees & payments → Subscription gating`, per-tier, `-1` = unlimited).
-  Enforced server-side in `POST /api/parcels` — the create endpoint itself rejects a
-  new listing over the cap, so this can't be bypassed by calling the API directly.
-  The landowner dashboard shows the current plan, listing count, and
-  subscribe/upgrade buttons.
-- **Farmers** — an active Premium subscription unlocks the full price-intelligence
-  breakdown (`GET /api/parcels/price-analytics`, county x crop averages); free
-  farmers get a single marketplace-wide average as a teaser. Premium also unlocks
-  **early access**: if an admin sets `gating.earlyAccessHours` above 0, a brand-new
-  listing is only visible to Premium farmers and admins until that window passes —
-  everyone else (including anonymous visitors) sees it once it's public. This is off
-  by default (`earlyAccessHours: 0`), so it has zero effect until an admin turns it
-  on.
-
-**A caching note, if you touch the marketplace list route:** `GET /api/parcels`
-normally caches its JSON response by URL (`middleware/cache.js`) since it's the
-highest-traffic endpoint and identical for every anonymous visitor. Early access
-breaks that assumption — the same URL can now correctly return different results for
-a Premium farmer than for everyone else — so the route only ever serves/writes the
-cache for requests with no `Authorization` header; any logged-in request is always
-computed fresh (see `cacheGetAnonymousOnly` in `routes/parcels.js`). If you add more
-entitlement-based filtering to that route, keep it inside that same guard rather than
-caching it — a stale cache entry here is a bug, not just an efficiency loss.
-
-`GET /api/subscriptions/mine` returns a user's own current plan for both types
-(`{ landowner: {...}, farmer: {...} }`) — the frontend dashboards use this to know
-what to show; it's the only place that should be trusted for "what plan is this user
-actually on right now."
-
-## Land price intelligence
-
-`/intelligence` (any logged-in user) is §6 of the business model: a free
-marketplace-wide teaser (`GET /api/intelligence/summary`, no auth) plus a paid,
-per-county/crop report (`GET /api/intelligence/report`). Report price and validity
-period are admin-editable under **Fees & payments → Land price intelligence**.
-
-The full report — price trend over the last 90 days, a demand score (average
-applications per listing in that region), water access/financing/insurance rates, and
-a suggested price band — is computed live from whatever's currently listed and
-applied to, so it's never stale data. It's gated behind a successful
-`intelligence_report` payment scoped to that county (and, if bought for a specific
-crop, that crop only — a county-wide "all crops" purchase unlocks every crop within
-it). Buying again after the report expires (`reportValidityDays`, default 30) charges
-again; buying early doesn't extend anything, since — unlike a subscription — a report
-is a one-off snapshot rather than a recurring plan.
-
-`GET /api/intelligence/report` always returns the headline average and sample size
-even when the caller hasn't paid, so the teaser and the "buy report" prompt can share
-one endpoint — check the `unlocked` field to know whether the rest of the payload
-(trend/demand/rates/band) is present.
-
-## Financing & insurance referrals
-
-`/api/referrals` (§8/§9 of the business model) is deliberately not another M-Pesa fee
-— the money direction is reversed. Landora doesn't lend, underwrite, or move a
-farmer's money here; it introduces them to a `ReferralPartner` (an admin-managed
-financing or insurance provider — `Admin → Referrals`) and tracks the introduction as
-a `ReferralRequest`. There's no partner API integration in this pass, so the whole
-lifecycle is admin-driven:
-
-1. A farmer or landowner requests an introduction from their dashboard's
-   "Financing & insurance" panel, optionally with a note.
-2. An admin reviews it under `Admin → Referrals`, moving its status forward
-   (`submitted → contacted → approved/declined → disbursed`) as the partner reports
-   back off-platform (email, phone, however that relationship actually works).
-3. If the partner pays Landora a commission for the referral converting, the admin
-   enters that amount when marking it `disbursed` — the endpoint refuses to set that
-   status without a commission figure, so the revenue total on the Referrals tab can't
-   silently under-count. That figure is the real, earned number; `referralFeeKes` on
-   the partner itself is just what an admin expects, for their own reference.
-
-Extending this later to an automated partner API (so a "disbursed" webhook updates
-the request itself) would slot into `PATCH /api/admin/referrals/:id` without touching
-anything else — the manual path and an automated one both end up calling the same
-update.
-
-## Bulk land search
-
-`/api/bulk-search` (§7 of the business model) is for the "we need 500-1,000 acres for
-contract farming" case — an institutional or agribusiness buyer describes what they
-need instead of browsing listing by listing, and Landora aggregates matching parcels
-for a fee. Like referrals, there's no automated matching engine in this pass — the
-whole thing is admin-curated:
-
-1. A buyer submits a request from their dashboard's "Bulk land search" panel — target
-   acreage, counties (optional — blank means any), crop/land use, a price ceiling, and
-   whether water access is required.
-2. An admin reviews it under `Admin → Bulk search`, searches the marketplace (the same
-   parcel list the Listings tab already has loaded — no extra fetch), and checks off
-   the listings that match. Moving the request to `proposal_sent` sets an aggregation
-   fee — defaults to `Admin → Fees & payments → bulkSearch.defaultFeeKes`, but is
-   editable per request since a 1,000-acre search across five counties is more work
-   than a 50-acre one in a single county.
-3. The buyer sees the request's status and how many parcels matched as soon as a
-   proposal is sent — but `GET /api/bulk-search/mine` deliberately withholds *which*
-   parcels until the aggregation fee is paid (`fee_paid` or `fulfilled` status only;
-   see the `unlockedStatuses` check in `routes/bulkSearch.js`), so the buyer is paying
-   to see the actual proposal, not just to submit the inquiry.
-4. Paying is the same M-Pesa flow as everything else (`type: 'bulk_search_fee'`,
-   `bulkSearchRequestId` on `POST /api/payments/initiate`) — a successful payment
-   automatically advances the request from `proposal_sent` to `fee_paid`
-   (`unlockBulkSearchIfPaid` in `routes/payments.js`), which is what actually unlocks
-   the parcel list on the buyer's next fetch.
-5. Any lease that actually results from a matched parcel still goes through the
-   normal apply → accept → pay-commission flow — the aggregation fee only covers the
-   search itself, not a transaction commission on top.
-
 ## Verification delivery
-
 
 The verification flow is implemented end to end in the API and UI. It generates separate,
 short-lived email and phone codes, stores only hashes, requires both codes, and supports:
@@ -319,35 +205,113 @@ before enabling verification in production. For local QA only, set
 `DEV_RETURN_VERIFICATION_CODES=true` to show the generated codes in the recovery screen; in
 production they are never returned to the browser.
 
+**Phone verification for key actions**, separately from the sign-up/sign-in policy above:
+a farmer or landowner verifies their phone once from **Profile → Verification**
+(`POST /api/auth/phone/otp/request` + `/confirm`), and `user.phoneVerified` then gates
+applying to lease, publishing a listing, and starting a chat — regardless of whether the
+admin has the combined sign-up/sign-in verification switched on. Changing your phone
+number on your profile resets this and requires re-verifying.
+
+## Buyer/seller national ID verification
+
+Both farmers (buyers) and landowners (sellers) submit their national ID from
+**Profile → Verification** (`POST /api/auth/id-verification/submit`), or optionally at
+sign-up. `requireIdVerified` (alongside `requirePhoneVerified`) blocks applying to lease
+and publishing a listing until `idVerification.status === 'verified'`.
+
+- If `IPRS_WEBHOOK_URL` is set, the ID is checked automatically against whatever you
+  point that webhook at (a licensed IPRS integrator, Smile Identity, your own KYC
+  service, etc) — POSTed `{ idNumber, fullName, brand }`, expected to respond
+  `{ matched, fullNameOnRecord?, reason? }`.
+- Without it, submissions are simply queued as `pending` and show up in
+  `/admin/users`, where an admin can mark them verified/flagged, add notes, or re-run
+  the automated check once a provider is wired up — the same manual fallback pattern
+  already used for land title verification on a parcel.
+
+## GIS land productivity report (paid)
+
+The report is still generated for every parcel by the internal GIS/actuarial pass and
+edited from `/admin/parcels/:id` exactly as before. What changed is who can read the
+*full* report:
+
+- The parcel's own landowner and any admin always see it for free.
+- Everyone else (a prospective tenant farmer) sees a locked preview (just the score
+  letter) on the listing page, with an **"Unlock the full report"** button that opens
+  the same M-Pesa payment modal used everywhere else in the app (`type: 'gis_report'`).
+  Price is set from `/admin` → **Fees & payments** → *GIS land productivity report*.
+- `GET /api/parcels/:idOrSlug` (the public, cached listing endpoint) never includes the
+  full report, so a per-user unlock can never leak into the shared cache. The full
+  report is only ever served from `GET /api/parcels/:id/productivity-report`, which is
+  authenticated and checks ownership/admin/payment on every call.
+
+## Live chat
+
+A real-time thread between a farmer and a landowner about one specific parcel, started
+from **"Message the landowner"** on any listing page.
+
+- **Transport**: Socket.io, sharing the same HTTP server/port as the REST API
+  (`backend/server.js`). Each socket authenticates with the same JWT the REST API uses
+  (`auth: { token }` on connect) — no separate chat login.
+- **REST is the source of truth**: `POST /api/chat/conversations` starts/fetches a
+  thread, `GET /api/chat/conversations` lists yours with unread counts, `GET
+  .../messages` returns history, `POST .../messages` sends (and broadcasts over the
+  socket to anyone with that thread open). Chat works from history alone even if the
+  socket hasn't connected yet.
+- **Presence + SMS fallback**: `backend/services/realtime.js` tracks who currently has
+  a socket open. If a message arrives for someone who isn't connected at all, they get
+  an SMS nudge (`SMS_WEBHOOK_URL`, same optional pattern as everywhere else) instead of
+  a message that silently waits for them to open the app.
+- **Frontend**: `frontend/src/context/ChatContext.jsx` owns the socket connection and
+  conversation list; `frontend/src/components/ChatDrawer.jsx` is the floating launcher
+  + slide-over drawer, mounted globally for any logged-in farmer/landowner.
+
+## SMS notifications for key actions
+
+Separate from OTP delivery (which also uses `SMS_WEBHOOK_URL`, just with a different
+payload shape), `backend/services/sms.js` sends free-text notifications for: welcome on
+sign-up, a new lease application, a lease application accepted/declined, ID
+verified/flagged, phone verified, and a chat message when the recipient isn't online.
+Every call site fires-and-forgets — an SMS provider outage (or `SMS_WEBHOOK_URL` never
+being set) never fails or blocks the underlying application/payment/chat action; it's
+just skipped with a console warning.
+
 ## What's stubbed out (needs your own provider accounts)
 
-The original design includes SMS OTP, IPRS national ID verification, and M-Pesa
-payments. These are **not fake-implemented** — they simply aren't wired up yet, because
-they require real accounts and API keys only you can obtain:
+None of these are fake-implemented — the full flow (validation, DB state, admin UI, and
+a manual fallback where relevant) works end to end. What's missing is only the actual
+third-party account/API key, which only you can obtain:
 
-- Direct SMS/email vendor SDK setup: the webhook boundary accepts Africa's Talking, Twilio,
-  SendGrid, Postmark, or another provider without tying the ZIP to one vendor
-- ID verification: an IPRS-integrated KYC provider
-- Payments: Safaricom Daraja (M-Pesa)
+- **SMS/email delivery**: the webhook boundary (`EMAIL_WEBHOOK_URL` /
+  `SMS_WEBHOOK_URL`) accepts Africa's Talking, Twilio, SendGrid, Postmark, or another
+  provider without tying the ZIP to one vendor. Without one set, OTPs/notifications are
+  logged to the server console instead of sent — everything else keeps working.
+- **National ID verification**: `IPRS_WEBHOOK_URL` for an automated IPRS-style lookup.
+  Without it, every submission is queued for the manual review queue at `/admin/users`.
+- **Payments**: Safaricom Daraja (M-Pesa) — see "Payments (M-Pesa)" above.
 
 Once you have accounts with any of these, the cleanest place to add them is a new
-`backend/services/` module per provider, called from the relevant route — happy to wire
-these in once you've picked providers.
+`backend/services/` module per provider (there's already one per concern —
+`notify.js`, `sms.js`, `verification.js`, `idVerification.js`, `mpesa.js`), called from
+the relevant route.
 
 ## Deployment notes
 
 - **Backend**: Render, Railway, or Fly.io are the simplest for a small Node API. Set
   `MONGO_URI`, `JWT_SECRET`, and `CORS_ORIGINS` (your deployed frontend URL) as
-  environment variables in the platform's dashboard — never commit `.env`.
+  environment variables in the platform's dashboard — never commit `.env`. Deploy as a
+  plain Node process (`npm start`); live chat shares the same HTTP server/port, so
+  there's nothing extra to stand up, but pick a host that supports long-lived
+  WebSocket connections (all three above do).
 - **Frontend**: `npm run build` in `frontend/` produces static files in `frontend/dist/`
   — deploy that folder to Netlify, Vercel, or Cloudflare Pages. Set `VITE_API_URL` to
-  your deployed backend's URL before building.
-- Always serve both over HTTPS in production.
+  your deployed backend's URL before building, and `VITE_SOCKET_URL` too if it differs
+  from `VITE_API_URL` with `/api` stripped off (same origin is assumed otherwise).
+- Always serve both over HTTPS (and WSS) in production.
 
 ## Extending this to the rest of the platform
 
-The remaining role dashboards and features from the original design (financing,
-insurance, GIS overlays, matching engine, live chat, admin approvals) each map cleanly
-onto this same pattern: a Mongoose model, an Express router with ownership/role checks,
-and a React page calling `src/api.js`. Happy to build out the next slice whenever you're
-ready — just say which one.
+The remaining role dashboards from the original design (investor, insurer, agronomist,
+agrovet, transporter) and insurance payout simulation each map cleanly onto this same
+pattern: a Mongoose model, an Express router with ownership/role checks, and a React
+page calling `src/api.js`. Happy to build out the next slice whenever you're ready —
+just say which one.

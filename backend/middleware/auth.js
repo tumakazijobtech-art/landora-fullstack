@@ -23,25 +23,6 @@ async function requireAuth(req, res, next) {
   }
 }
 
-// Like requireAuth, but never rejects the request — attaches req.user if a valid
-// token is present, otherwise leaves it undefined and continues. Used on public
-// endpoints (the marketplace list) that need to know a caller's entitlements
-// (e.g. farmer premium early access) without requiring a login.
-async function optionalAuth(req, res, next) {
-  try {
-    const header = req.headers.authorization || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-    if (!token) return next();
-
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(payload.sub).select('-passwordHash');
-    if (user) req.user = user;
-    next();
-  } catch {
-    next(); // invalid/expired token on a public endpoint — just treat as anonymous
-  }
-}
-
 // Restricts a route to specific roles. Use after requireAuth.
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -52,4 +33,30 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { requireAuth, requireRole, optionalAuth };
+// Gates "key actions" — applying to lease a parcel, publishing a listing, starting
+// a chat with the other party — behind the standalone phone OTP check (see
+// services/verification.js issuePhoneVerification). Use after requireAuth.
+function requirePhoneVerified(req, res, next) {
+  if (!req.user.phoneVerified) {
+    return res.status(403).json({
+      error: 'Please verify your phone number before continuing.',
+      code: 'PHONE_NOT_VERIFIED',
+    });
+  }
+  next();
+}
+
+// Gates the same key actions behind a verified national ID — buyers (farmers)
+// before they can apply to lease, sellers (landowners) before they can publish a
+// listing. Use after requireAuth.
+function requireIdVerified(req, res, next) {
+  if (!req.user.idVerification || req.user.idVerification.status !== 'verified') {
+    return res.status(403).json({
+      error: 'Please submit your national ID for verification before continuing.',
+      code: 'ID_NOT_VERIFIED',
+    });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireRole, requirePhoneVerified, requireIdVerified };

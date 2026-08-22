@@ -15,7 +15,7 @@ const POLL_TIMEOUT_MS = 90 * 1000;
 //
 // title/description are shown before the user enters their number; onSuccess fires
 // once the payment record flips to "success" so the parent can refresh its data.
-export default function PaymentModal({ open, onClose, type, tier, applicationId, parcelId, county, crop, bulkSearchRequestId, title, description, onSuccess }) {
+export default function PaymentModal({ open, onClose, type, tier, applicationId, parcelId, title, description, onSuccess }) {
   const { token, user } = useAuth();
   const [phone, setPhone] = useState(user?.phone || '');
   const [stage, setStage] = useState('form'); // form | pushing | waiting | success | failed
@@ -77,7 +77,7 @@ export default function PaymentModal({ open, onClose, type, tier, applicationId,
     setStage('pushing');
     try {
       const data = await api.initiatePayment(
-        { type, tier, applicationId, parcelId, county, crop, bulkSearchRequestId, phone },
+        { type, tier, applicationId, parcelId, phone },
         token
       );
       setPayment(data.payment);

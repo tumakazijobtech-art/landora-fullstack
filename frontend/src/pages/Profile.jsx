@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { COUNTIES, LOGO_URL } from '../constants.js';
 import { LogoutIcon } from '../components/Icons.jsx';
+import VerificationPanel from '../components/VerificationPanel.jsx';
 
 export default function Profile() {
   const { user, token, updateUser, logout } = useAuth();
@@ -97,6 +98,8 @@ export default function Profile() {
             </button>
           </form>
         </div>
+
+        {(user.role === 'farmer' || user.role === 'landowner') && <VerificationPanel />}
 
         <div className="panel profile-logout-panel">
           <div>

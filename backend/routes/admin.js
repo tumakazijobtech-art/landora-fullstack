@@ -6,11 +6,11 @@ const AuthSettings = require('../models/AuthSettings');
 const WaitlistEntry = require('../models/WaitlistEntry');
 const FeeSettings = require('../models/FeeSettings');
 const Payment = require('../models/Payment');
-const ReferralPartner = require('../models/ReferralPartner');
-const ReferralRequest = require('../models/ReferralRequest');
-const BulkSearchRequest = require('../models/BulkSearchRequest');
+const User = require('../models/User');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const cache = require('../middleware/cache');
+const { notifySms } = require('../services/sms');
+const { verifyNationalId } = require('../services/idVerification');
 
 const router = express.Router();
 
@@ -50,6 +50,92 @@ router.patch(
         requireVerificationOnSignIn: settings.requireVerificationOnSignIn,
       },
     });
+  }
+);
+
+// Admin: every user (buyers and sellers), most recent first, optionally filtered by
+// ID-verification status — the queue for reviewing submissions that couldn't be
+// auto-checked (IPRS_WEBHOOK_URL not configured, or the automated check flagged a
+// mismatch). Mirrors the Parcel.titleVerification admin flow.
+router.get(
+  '/users',
+  [
+    query('role').optional().isIn(['farmer', 'landowner', 'admin']),
+    query('idStatus').optional().isIn(['unverified', 'pending', 'verified', 'flagged']),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Invalid filter parameters' });
+
+    const filter = {};
+    if (req.query.role) filter.role = req.query.role;
+    if (req.query.idStatus) filter['idVerification.status'] = req.query.idStatus;
+
+    const users = await User.find(filter)
+      .select('-passwordHash -verification -passwordReset')
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+    res.json({ users });
+  }
+);
+
+// Admin: manually verify/flag a user's national ID — the fallback for when no
+// IPRS_WEBHOOK_URL is configured, or when the automated check needs a human look
+// (e.g. a name mismatch on a legal name change). Re-running the automated check is
+// also available here (method: 'iprs') for when a provider has just been wired up.
+router.patch(
+  '/users/:id/id-verification',
+  [
+    body('status').optional().isIn(['unverified', 'pending', 'verified', 'flagged']),
+    body('idNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+    body('fullNameOnRecord').optional({ checkFalsy: true }).trim().isLength({ max: 120 }),
+    body('notes').optional({ checkFalsy: true }).trim().isLength({ max: 500 }),
+    body('recheck').optional().isBoolean(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (req.body.idNumber) user.nationalId = req.body.idNumber;
+
+    if (req.body.recheck) {
+      const result = await verifyNationalId({
+        idNumber: req.body.idNumber || user.nationalId,
+        fullName: user.name,
+      });
+      user.idVerification = {
+        ...(user.idVerification ? user.idVerification.toObject() : {}),
+        ...result,
+        idNumber: req.body.idNumber || user.nationalId,
+        checkedBy: `${req.user.name} (recheck)`,
+        checkedAt: new Date(),
+      };
+    } else {
+      user.idVerification = {
+        ...(user.idVerification ? user.idVerification.toObject() : {}),
+        idNumber: req.body.idNumber || user.nationalId,
+        fullNameOnRecord: req.body.fullNameOnRecord,
+        notes: req.body.notes,
+        status: req.body.status || 'verified',
+        method: 'manual',
+        checkedBy: req.user.name,
+        checkedAt: new Date(),
+      };
+    }
+
+    await user.save();
+
+    if (user.idVerification.status === 'verified' && user.phone) {
+      notifySms(user.phone, 'Your Landora ID verification is complete. You can now apply to lease or publish listings.', { purpose: 'id_verified' });
+    } else if (user.idVerification.status === 'flagged' && user.phone) {
+      notifySms(user.phone, 'Landora: we could not verify your national ID. Please check your details or contact support.', { purpose: 'id_flagged' });
+    }
+
+    res.json({ user: user.toSafeJSON() });
   }
 );
 
@@ -243,6 +329,17 @@ router.patch(
 
     res.json({ application: populated });
     cache.invalidate('/api/parcels');
+
+    if (populated.farmer && populated.farmer.phone) {
+      const parcelTitle = populated.parcel ? populated.parcel.title : 'your parcel';
+      notifySms(
+        populated.farmer.phone,
+        req.body.status === 'accepted'
+          ? `Landora: Your application for "${parcelTitle}" was accepted! Check your dashboard for next steps.`
+          : `Landora: Your application for "${parcelTitle}" was declined.`,
+        { purpose: 'application_decision' }
+      );
+    }
   }
 );
 
@@ -303,12 +400,12 @@ router.get('/fee-settings', async (req, res) => {
 router.patch(
   '/fee-settings',
   [
-    body('commitment.feeKes').optional().isFloat({ min: 0 }),
     body('commission.percent').optional().isFloat({ min: 0, max: 100 }),
     body('commission.minKes').optional().isFloat({ min: 0 }),
     body('commission.maxKes').optional().isFloat({ min: 0 }),
     body('verification.basicKes').optional().isFloat({ min: 0 }),
     body('verification.premiumKes').optional().isFloat({ min: 0 }),
+    body('gisReport.priceKes').optional().isFloat({ min: 0 }),
     body('leaseContract.basicKes').optional().isFloat({ min: 0 }),
     body('leaseContract.professionalKes').optional().isFloat({ min: 0 }),
     body('landownerSubscription.individualKes').optional().isFloat({ min: 0 }),
@@ -318,21 +415,13 @@ router.patch(
     body('mpesa.tillNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
     body('mpesa.shortcode').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
     body('mpesa.accountReferencePrefix').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
-    body('gating.freeListingLimit').optional().isInt({ min: 0 }),
-    body('gating.individualListingLimit').optional().isInt({ min: -1 }),
-    body('gating.multiPropertyListingLimit').optional().isInt({ min: -1 }),
-    body('gating.institutionalListingLimit').optional().isInt({ min: -1 }),
-    body('gating.earlyAccessHours').optional().isFloat({ min: 0 }),
-    body('intelligence.reportFeeKes').optional().isFloat({ min: 0 }),
-    body('intelligence.reportValidityDays').optional().isInt({ min: 1 }),
-    body('bulkSearch.defaultFeeKes').optional().isFloat({ min: 0 }),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
     const fees = await FeeSettings.getSingleton();
-    const groups = ['commitment', 'commission', 'verification', 'leaseContract', 'landownerSubscription', 'farmerPremium', 'mpesa', 'gating', 'intelligence', 'bulkSearch'];
+    const groups = ['commission', 'verification', 'gisReport', 'leaseContract', 'landownerSubscription', 'farmerPremium', 'mpesa'];
     groups.forEach((group) => {
       if (req.body[group] && typeof req.body[group] === 'object') {
         fees[group] = { ...(fees[group] ? fees[group].toObject() : {}), ...req.body[group] };
@@ -347,7 +436,7 @@ router.patch(
 router.get(
   '/payments',
   [
-    query('type').optional().isIn(['commitment', 'commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'intelligence_report', 'bulk_search_fee']),
+    query('type').optional().isIn(['commission', 'verification', 'lease_contract', 'landowner_subscription', 'farmer_premium', 'gis_report']),
     query('status').optional().isIn(['pending', 'success', 'failed', 'cancelled']),
   ],
   async (req, res) => {
@@ -371,185 +460,6 @@ router.get(
     ]);
 
     res.json({ payments, totals });
-  }
-);
-
-// Admin: financing/insurance partners — §8/§9 of the business model. Landora earns a
-// commission when a referral converts, recorded manually on the ReferralRequest once
-// the partner actually pays (see the referral-request endpoints below); this list is
-// just who a farmer/landowner can currently be introduced to.
-router.get('/referral-partners', async (req, res) => {
-  const partners = await ReferralPartner.find().sort({ type: 1, name: 1 }).lean();
-  res.json({ partners });
-});
-
-router.post(
-  '/referral-partners',
-  [
-    body('name').trim().isLength({ min: 1, max: 120 }),
-    body('type').isIn(['financing', 'insurance']),
-    body('description').optional({ checkFalsy: true }).trim().isLength({ max: 500 }),
-    body('contactEmail').optional({ checkFalsy: true }).trim().isLength({ max: 160 }),
-    body('contactPhone').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
-    body('referralFeeKes').optional().isFloat({ min: 0 }),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
-    const partner = await ReferralPartner.create(req.body);
-    res.status(201).json({ partner });
-  }
-);
-
-router.patch(
-  '/referral-partners/:id',
-  [
-    body('name').optional().trim().isLength({ min: 1, max: 120 }),
-    body('type').optional().isIn(['financing', 'insurance']),
-    body('description').optional({ checkFalsy: true }).trim().isLength({ max: 500 }),
-    body('contactEmail').optional({ checkFalsy: true }).trim().isLength({ max: 160 }),
-    body('contactPhone').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
-    body('referralFeeKes').optional().isFloat({ min: 0 }),
-    body('active').optional().isBoolean(),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
-    const partner = await ReferralPartner.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-    if (!partner) return res.status(404).json({ error: 'Partner not found' });
-    res.json({ partner });
-  }
-);
-
-router.delete('/referral-partners/:id', async (req, res) => {
-  const partner = await ReferralPartner.findByIdAndDelete(req.params.id);
-  if (!partner) return res.status(404).json({ error: 'Partner not found' });
-  res.json({ ok: true });
-});
-
-// Admin: every referral request, and moving one forward as the partner reports back
-// (there's no partner API integration in this pass, so this is manual).
-router.get(
-  '/referrals',
-  [
-    query('status').optional().isIn(['submitted', 'contacted', 'approved', 'declined', 'disbursed']),
-    query('type').optional().isIn(['financing', 'insurance']),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: 'Invalid filter parameters' });
-
-    const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    if (req.query.type) filter.type = req.query.type;
-
-    const referrals = await ReferralRequest.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(500)
-      .populate('user', 'name email phone role')
-      .populate('partner', 'name type')
-      .populate('parcel', 'title county')
-      .lean();
-
-    const disbursedTotal = await ReferralRequest.aggregate([
-      { $match: { status: 'disbursed' } },
-      { $group: { _id: '$type', total: { $sum: '$commissionKes' }, count: { $sum: 1 } } },
-    ]);
-
-    res.json({ referrals, disbursedTotal });
-  }
-);
-
-router.patch(
-  '/referrals/:id',
-  [
-    body('status').optional().isIn(['submitted', 'contacted', 'approved', 'declined', 'disbursed']),
-    body('adminNote').optional({ checkFalsy: true }).trim().isLength({ max: 1000 }),
-    body('commissionKes').optional().isFloat({ min: 0 }),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
-
-    const referral = await ReferralRequest.findById(req.params.id);
-    if (!referral) return res.status(404).json({ error: 'Referral request not found' });
-
-    if (req.body.status) referral.status = req.body.status;
-    if (req.body.adminNote !== undefined) referral.adminNote = req.body.adminNote;
-    if (req.body.commissionKes !== undefined) referral.commissionKes = req.body.commissionKes;
-
-    // Marking a referral "disbursed" without a commission amount would silently
-    // undercount revenue — require one at that point, even if it's set later on a
-    // separate edit before disbursement is confirmed.
-    if (referral.status === 'disbursed' && referral.commissionKes == null) {
-      return res.status(400).json({ error: 'Enter the commission amount before marking a referral as disbursed' });
-    }
-
-    await referral.save();
-    res.json({ referral });
-  }
-);
-
-// Admin: institutional/agribusiness bulk search requests (§7). Reviewing one means
-// hand-picking matching parcels from the marketplace (the admin parcels list already
-// available to this dashboard) and setting an aggregation fee; the buyer then pays
-// via M-Pesa to unlock the proposal (see routes/payments.js and routes/bulkSearch.js).
-router.get(
-  '/bulk-search',
-  [query('status').optional().isIn(['submitted', 'reviewing', 'proposal_sent', 'fee_paid', 'fulfilled', 'declined'])],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: 'Invalid filter parameters' });
-
-    const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-
-    const requests = await BulkSearchRequest.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(500)
-      .populate('user', 'name email phone role')
-      .populate('matchedParcels', 'title county sizeAcres pricePerAcrePerSeason')
-      .lean();
-
-    res.json({ requests });
-  }
-);
-
-router.patch(
-  '/bulk-search/:id',
-  [
-    body('status').optional().isIn(['submitted', 'reviewing', 'proposal_sent', 'fee_paid', 'fulfilled', 'declined']),
-    body('matchedParcels').optional().isArray({ max: 200 }),
-    body('matchedParcels.*').optional().isMongoId(),
-    body('aggregationFeeKes').optional().isFloat({ min: 0 }),
-    body('adminNote').optional({ checkFalsy: true }).trim().isLength({ max: 1000 }),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
-
-    const request = await BulkSearchRequest.findById(req.params.id);
-    if (!request) return res.status(404).json({ error: 'Bulk search request not found' });
-
-    if (req.body.matchedParcels) request.matchedParcels = req.body.matchedParcels;
-    if (req.body.aggregationFeeKes !== undefined) request.aggregationFeeKes = req.body.aggregationFeeKes;
-    if (req.body.adminNote !== undefined) request.adminNote = req.body.adminNote;
-    if (req.body.status) request.status = req.body.status;
-
-    // A proposal needs at least one matched parcel and a fee to charge for it — the
-    // buyer can't pay for something that isn't priced yet.
-    if (request.status === 'proposal_sent') {
-      if (!request.matchedParcels || request.matchedParcels.length === 0) {
-        return res.status(400).json({ error: 'Add at least one matched parcel before sending a proposal' });
-      }
-      if (request.aggregationFeeKes == null) {
-        const fees = await FeeSettings.getSingleton();
-        request.aggregationFeeKes = fees.bulkSearch.defaultFeeKes;
-      }
-    }
-
-    await request.save();
-    res.json({ request });
   }
 );
 

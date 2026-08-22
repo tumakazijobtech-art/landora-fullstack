@@ -115,10 +115,50 @@ async function issuePasswordReset(user) {
   };
 }
 
+// Standalone phone-only OTP check, independent of the combined email+phone
+// signup/signin verification above. This is what gates "key actions" — applying to
+// lease a parcel, publishing a listing, starting a chat — regardless of whether the
+// admin has the signup/signin verification policy switched on at all. Reuses the
+// same `verification` subdocument on the User model (purpose: 'phone_verify') so
+// there is only ever one in-flight code per user.
+async function issuePhoneVerification(user) {
+  const phoneCode = createCode();
+  const expiresAt = new Date(Date.now() + CODE_TTL_MS);
+
+  user.verification = {
+    purpose: 'phone_verify',
+    emailCodeHash: null,
+    emailCodeExpiresAt: null,
+    phoneCodeHash: hashCode(phoneCode),
+    phoneCodeExpiresAt: expiresAt,
+  };
+
+  await deliverCode('phone', user.phone, phoneCode, 'phone_verify');
+
+  return {
+    phone: maskPhone(user.phone),
+    expiresInSeconds: CODE_TTL_MS / 1000,
+    ...(process.env.DEV_RETURN_VERIFICATION_CODES === 'true'
+      ? { developmentCode: phoneCode }
+      : {}),
+  };
+}
+
+function confirmPhoneVerification(user, phoneCode) {
+  const verification = user.verification;
+  return (
+    verification
+    && verification.purpose === 'phone_verify'
+    && matchesCode(phoneCode, verification.phoneCodeHash, verification.phoneCodeExpiresAt)
+  );
+}
+
 module.exports = {
   CODE_TTL_MS,
   hashCode,
   matchesCode,
   issueVerification,
   issuePasswordReset,
+  issuePhoneVerification,
+  confirmPhoneVerification,
 };

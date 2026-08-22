@@ -62,6 +62,15 @@ export const api = {
   me: (token) => request('/auth/me', { token }),
   updateProfile: (payload, token) => request('/auth/profile', { method: 'PATCH', body: payload, token }),
 
+  // Standalone phone-only OTP check that gates key actions (apply to lease, publish
+  // a listing, chat) — independent of the combined email+phone signup/signin policy.
+  requestPhoneOtp: (token) => request('/auth/phone/otp/request', { method: 'POST', token }),
+  confirmPhoneOtp: (code, token) => request('/auth/phone/otp/confirm', { method: 'POST', body: { code }, token }),
+
+  // National ID verification for buyers and sellers — see requireIdVerified.
+  submitIdVerification: (nationalId, token) =>
+    request('/auth/id-verification/submit', { method: 'POST', body: { nationalId }, token }),
+
   listParcels: (params = {}) => {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null))
@@ -69,6 +78,10 @@ export const api = {
     return request(`/parcels${qs ? `?${qs}` : ''}`, { cacheTtlMs: LIST_TTL_MS });
   },
   getParcel: (id) => request(`/parcels/${id}`, { cacheTtlMs: DETAIL_TTL_MS }),
+  // Full GIS land productivity report for one parcel — per-user access (free for
+  // the owner/admin, otherwise requires a successful 'gis_report' payment), so this
+  // is never cached client-side either.
+  getProductivityReport: (id, token) => request(`/parcels/${id}/productivity-report`, { token }),
   createParcel: (payload, token) =>
     request('/parcels', { method: 'POST', body: payload, token }).then((data) => {
       cacheInvalidate('GET:/parcels');
@@ -175,49 +188,6 @@ export const api = {
   getPaymentStatus: (id, token) => request(`/payments/${id}/status`, { token }),
   myPayments: (token) => request('/payments/mine', { token }),
 
-  // Subscription gating — a user's own active landowner/farmer plan, and the
-  // premium-only farmer price analytics view. See backend/services/subscriptions.js
-  // for how a plan is derived from payment history.
-  mySubscriptions: (token) => request('/subscriptions/mine', { token }),
-  priceAnalytics: (token) => request('/parcels/price-analytics', { token }),
-
-  // Land price intelligence (§6) — a free marketplace-wide teaser, plus paid,
-  // time-limited reports per county/crop. See backend/routes/intelligence.js.
-  intelligenceSummary: () => request('/intelligence/summary'),
-  intelligenceReport: (params, token) => {
-    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
-    return request(`/intelligence/report${qs ? `?${qs}` : ''}`, { token });
-  },
-
-  // Financing & insurance referrals (§8/§9) — Landora doesn't lend/underwrite, just
-  // connects users to partners and tracks the introduction through to commission.
-  referralPartners: (type, token) => request(`/referrals/partners${type ? `?type=${type}` : ''}`, { token }),
-  createReferral: (payload, token) => request('/referrals', { method: 'POST', body: payload, token }),
-  myReferrals: (token) => request('/referrals/mine', { token }),
-
-  // Admin: manage the partner list and move referral requests through to a recorded
-  // commission once the partner actually pays out.
-  adminReferralPartners: (token) => request('/admin/referral-partners', { token }),
-  adminCreateReferralPartner: (payload, token) => request('/admin/referral-partners', { method: 'POST', body: payload, token }),
-  adminUpdateReferralPartner: (id, payload, token) => request(`/admin/referral-partners/${id}`, { method: 'PATCH', body: payload, token }),
-  adminDeleteReferralPartner: (id, token) => request(`/admin/referral-partners/${id}`, { method: 'DELETE', token }),
-  adminReferrals: (token, params = {}) => {
-    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
-    return request(`/admin/referrals${qs ? `?${qs}` : ''}`, { token });
-  },
-  adminUpdateReferral: (id, payload, token) => request(`/admin/referrals/${id}`, { method: 'PATCH', body: payload, token }),
-
-  // Institutional/agribusiness bulk land search (§7) — "find us N acres matching
-  // these criteria." An admin compiles a proposal; the buyer pays an aggregation
-  // fee to unlock it. See backend/routes/bulkSearch.js.
-  submitBulkSearch: (payload, token) => request('/bulk-search', { method: 'POST', body: payload, token }),
-  myBulkSearchRequests: (token) => request('/bulk-search/mine', { token }),
-  adminBulkSearchRequests: (token, params = {}) => {
-    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
-    return request(`/admin/bulk-search${qs ? `?${qs}` : ''}`, { token });
-  },
-  adminUpdateBulkSearch: (id, payload, token) => request(`/admin/bulk-search/${id}`, { method: 'PATCH', body: payload, token }),
-
   // Admin: platform-wide fee configuration (commission %, verification/lease-contract
   // prices, subscription tiers, and the M-Pesa till/shortcode) and the full payment
   // ledger.
@@ -228,4 +198,25 @@ export const api = {
     const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
     return request(`/admin/payments${qs ? `?${qs}` : ''}`, { token });
   },
+
+  // Admin: buyer/seller ID verification review queue.
+  adminUsers: (token, params = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return request(`/admin/users${qs ? `?${qs}` : ''}`, { token });
+  },
+  adminUpdateIdVerification: (userId, payload, token) =>
+    request(`/admin/users/${userId}/id-verification`, { method: 'PATCH', body: payload, token }),
+
+  // Live chat — REST for conversation list/history/send; realtime push happens over
+  // Socket.io (see context/ChatContext.jsx), this is the fallback/source of truth.
+  startConversation: (payload, token) => request('/chat/conversations', { method: 'POST', body: payload, token }),
+  myConversations: (token) => request('/chat/conversations', { token }),
+  getMessages: (conversationId, token, params = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return request(`/chat/conversations/${conversationId}/messages${qs ? `?${qs}` : ''}`, { token });
+  },
+  sendMessage: (conversationId, body, token) =>
+    request(`/chat/conversations/${conversationId}/messages`, { method: 'POST', body: { body }, token }),
+  markConversationRead: (conversationId, token) =>
+    request(`/chat/conversations/${conversationId}/read`, { method: 'PATCH', token }),
 };

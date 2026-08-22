@@ -57,13 +57,11 @@ export default function Navbar() {
             <>
               <Link className="nav-link" to="/admin">Admin listings</Link>
               <Link className="nav-link" to="/admin/land-uses">Land uses</Link>
+              <Link className="nav-link" to="/admin/users">Users</Link>
             </>
           )}
           {user && (
             <Link className="nav-link" to="/saved">Saved</Link>
-          )}
-          {user && user.role !== 'admin' && (
-            <Link className="nav-link" to="/intelligence">Land intelligence</Link>
           )}
 
           {!user && (

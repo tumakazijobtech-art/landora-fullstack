@@ -8,7 +8,7 @@ export default function Register() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    name: '', email: '', password: '', role: 'farmer', phone: '', county: '', profilePicture: '', agreedToTerms: false,
+    name: '', email: '', password: '', role: 'farmer', phone: '', county: '', profilePicture: '', nationalId: '', agreedToTerms: false,
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -70,6 +70,18 @@ export default function Register() {
             <div className="field">
               <label>Phone number</label>
               <input required type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="07XX XXX XXX" />
+            </div>
+            <div className="field">
+              <label>National ID number (optional now, required to apply or list)</label>
+              <input
+                value={form.nationalId}
+                onChange={(e) => update('nationalId', e.target.value)}
+                placeholder="e.g. 12345678"
+              />
+              <div style={{ fontSize: 11.5, color: 'var(--s500)', marginTop: 6 }}>
+                You can also add and verify this later from your profile. Every buyer and seller must have a
+                verified ID before applying to lease or publishing a listing.
+              </div>
             </div>
             <div className="field">
               <label>County</label>

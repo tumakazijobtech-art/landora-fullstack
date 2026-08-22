@@ -15,16 +15,6 @@ const feeSettingsSchema = new mongoose.Schema(
   {
     key: { type: String, unique: true, default: 'fees' },
 
-    // --- Buyer commitment fee — a small flat fee a farmer pays right after applying
-    // for a lease, before the landowner has decided anything. Signals serious intent
-    // and lets landowners see which applicants have actually put money behind their
-    // interest (see the "Commitment fee paid" badge on the landowner dashboard).
-    // Distinct from §1 commission below, which is only charged once a lease is
-    // accepted.
-    commitment: {
-      feeKes: { type: Number, min: 0, default: 300 },
-    },
-
     // --- §1 Transaction commission — charged to the farmer when a lease application
     // is accepted, as a percentage of the first year's lease value (pricePerAcrePerSeason
     // x sizeAcres), bounded by a floor/ceiling so very small or very large leases stay
@@ -39,6 +29,15 @@ const feeSettingsSchema = new mongoose.Schema(
     verification: {
       basicKes: { type: Number, min: 0, default: 1500 },
       premiumKes: { type: Number, min: 0, default: 4500 },
+    },
+
+    // --- GIS land productivity report — paid by a farmer/buyer to unlock the full
+    // GIS + actuarial productivity report on a listing (soil, rainfall, vegetation
+    // index, market access, rainfall history, etc). The landowner who owns the
+    // parcel, and admins, always see the full report for free — this only gates the
+    // buyer-facing view. See routes/parcels.js GET /:id/productivity-report.
+    gisReport: {
+      priceKes: { type: Number, min: 0, default: 300 },
     },
 
     // --- §3 Digital lease contracts — paid by whichever party generates the
@@ -58,38 +57,6 @@ const feeSettingsSchema = new mongoose.Schema(
     // --- §5 Farmer / tenant premium subscription (monthly).
     farmerPremium: {
       monthlyKes: { type: Number, min: 0, default: 300 },
-    },
-
-    // --- Subscription gating — what each plan actually unlocks. Listing limits are
-    // the number of listings (any status) a landowner on that plan may have at once;
-    // a negative number means unlimited. earlyAccessHours is how long a brand-new
-    // listing stays visible to premium farmers/admins only before it appears on the
-    // public marketplace for everyone else — 0 turns early access off entirely.
-    gating: {
-      freeListingLimit: { type: Number, default: 1 },
-      individualListingLimit: { type: Number, default: 5 },
-      multiPropertyListingLimit: { type: Number, default: 25 },
-      institutionalListingLimit: { type: Number, default: -1 },
-      earlyAccessHours: { type: Number, min: 0, default: 0 },
-    },
-
-    // --- §6 Land price intelligence — a paid, per-region report (avg price, trend,
-    // demand, water/financing/insurance rates, suggested price band) sold to
-    // farmers, landowners, agribusinesses, NGOs, banks, and other institutions. A
-    // buyer's access to a specific county/crop report is checked against their own
-    // payment history for reportValidityDays — see routes/intelligence.js.
-    intelligence: {
-      reportFeeKes: { type: Number, min: 0, default: 2000 },
-      reportValidityDays: { type: Number, min: 1, default: 30 },
-    },
-
-    // --- §7 Institutional / agribusiness bulk land search — "find us 500 acres
-    // suitable for maize with water access". defaultFeeKes is the starting
-    // aggregation fee an admin sees when compiling a proposal for a request; they
-    // can override it per request (see BulkSearchRequest.aggregationFeeKes) since
-    // effort scales with how large or specific the search is.
-    bulkSearch: {
-      defaultFeeKes: { type: Number, min: 0, default: 5000 },
     },
 
     // --- M-Pesa Buy Goods collection details. tillNumber is used as PartyB on every

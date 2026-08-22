@@ -14,6 +14,7 @@ import ParcelDetail from './pages/ParcelDetail.jsx';
 import Terms from './pages/Terms.jsx';
 import Privacy from './pages/Privacy.jsx';
 import BottomNav from './components/BottomNav.jsx';
+import ChatDrawer from './components/ChatDrawer.jsx';
 
 // Code-split the pages most visitors never open in a given session (listing creation,
 // the two dashboards, and the whole admin back office). This keeps the first-load
@@ -25,9 +26,9 @@ const FarmerDashboard = lazy(() => import('./pages/FarmerDashboard.jsx'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 const AdminParcelEditor = lazy(() => import('./pages/AdminParcelEditor.jsx'));
 const AdminLandUses = lazy(() => import('./pages/AdminLandUses.jsx'));
+const AdminUsers = lazy(() => import('./pages/AdminUsers.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const Saved = lazy(() => import('./pages/Saved.jsx'));
-const LandIntelligence = lazy(() => import('./pages/LandIntelligence.jsx'));
 
 function PageFallback() {
   return <div className="section"><div className="section-inner">Loading…</div></div>;
@@ -91,14 +92,6 @@ export default function App() {
               }
             />
             <Route
-              path="/intelligence"
-              element={
-                <ProtectedRoute>
-                  <LandIntelligence />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/admin"
               element={
                 <ProtectedRoute role="admin">
@@ -115,6 +108,14 @@ export default function App() {
               }
             />
             <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/parcels/:id"
               element={
                 <ProtectedRoute role="admin">
@@ -127,6 +128,7 @@ export default function App() {
         </Suspense>
       </div>
       {user && <BottomNav />}
+      <ChatDrawer />
     </>
   );
 }

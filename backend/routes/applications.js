@@ -2,17 +2,21 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Application = require('../models/Application');
 const Parcel = require('../models/Parcel');
-const Payment = require('../models/Payment');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, requirePhoneVerified, requireIdVerified } = require('../middleware/auth');
 const { MAX_APPLICANTS } = require('../utils/constants');
+const { notifySms } = require('../services/sms');
 
 const router = express.Router();
 
-// Farmer: apply to a parcel.
+// Farmer: apply to a parcel. Buyers must have a verified phone number and a
+// verified national ID before they can apply — see requirePhoneVerified /
+// requireIdVerified in middleware/auth.js.
 router.post(
   '/',
   requireAuth,
   requireRole('farmer'),
+  requirePhoneVerified,
+  requireIdVerified,
   [
     body('parcelId').isMongoId(),
     body('intendedCrop').optional({ checkFalsy: true }).trim().isLength({ max: 80 }),
@@ -77,6 +81,20 @@ router.post(
         preferredSeason,
       });
       res.status(201).json({ application });
+
+      // Notify the landowner (fire-and-forget — never blocks or affects the
+      // response above; a no-op if SMS_WEBHOOK_URL isn't configured).
+      Parcel.findById(parcel._id).populate('owner', 'phone').then((p) => {
+        if (p && p.owner && p.owner.phone) {
+          notifySms(
+            p.owner.phone,
+            applicationType === 'prebooking'
+              ? `Landora: ${req.user.name} pre booked "${parcel.title}".`
+              : `Landora: ${req.user.name} applied to lease "${parcel.title}". Check your dashboard to review.`,
+            { purpose: 'application_submitted' }
+          );
+        }
+      }).catch(() => {});
     } catch (err) {
       if (err.code === 11000) {
         return res.status(409).json({ error: 'You already have an application on this parcel' });
@@ -112,21 +130,7 @@ router.get('/received', requireAuth, requireRole('landowner'), async (req, res) 
     .populate('parcel', 'title county location')
     .populate('farmer', 'name phone email county profilePicture')
     .lean();
-
-  // The commitment fee is paid by the farmer, so it never shows up in the
-  // landowner's own payment history — surfaced here instead as a computed flag per
-  // application, purely informational (does not gate or change anything else).
-  const paidApplicationIds = new Set(
-    (
-      await Payment.find({ type: 'commitment', status: 'success', application: { $in: applications.map((a) => a._id) } })
-        .select('application')
-        .lean()
-    ).map((p) => String(p.application))
-  );
-
-  res.json({
-    applications: applications.map((a) => ({ ...a, commitmentFeePaid: paidApplicationIds.has(String(a._id)) })),
-  });
+  res.json({ applications });
 });
 
 module.exports = router;
